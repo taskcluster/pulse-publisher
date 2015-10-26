@@ -1,6 +1,6 @@
 suite("Exchanges", function() {
   var assert  = require('assert');
-  var base    = require('../');
+  var subject = require('../');
   var config  = require('taskcluster-lib-config');
   var aws     = require('aws-sdk-promise');
 
@@ -22,7 +22,7 @@ suite("Exchanges", function() {
     }
 
     // Create an exchanges
-    var exchanges = new base.Exchanges({
+    var exchanges = new subject({
       title:              "Title for my Events",
       description:        "Test exchanges used for testing things only"
     });

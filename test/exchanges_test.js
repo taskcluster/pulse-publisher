@@ -1,11 +1,11 @@
 suite("Exchanges", function() {
   var assert  = require('assert');
-  var base    = require('../');
+  var subject = require('../');
   var debug   = require('debug')('base:test:exchanges');
 
   test("declare", function() {
     // Create an exchanges
-    var exchanges = new base.Exchanges({
+    var exchanges = new subject({
       title:              "Title for my Events",
       description:        "Test exchanges used for testing things only"
     });
@@ -52,7 +52,7 @@ suite("Exchanges", function() {
 
   test("declare two", function() {
     // Create an exchanges
-    var exchanges = new base.Exchanges({
+    var exchanges = new subject({
       title:              "Title for my Events",
       description:        "Test exchanges used for testing things only"
     });
@@ -136,7 +136,7 @@ suite("Exchanges", function() {
 
   test("reference", function() {
     // Create an exchanges
-    var exchanges = new base.Exchanges({
+    var exchanges = new subject({
       title:              "Title for my Events",
       description:        "Test exchanges used for testing things only"
     });
@@ -192,7 +192,7 @@ suite("Exchanges", function() {
 
   test("reference (pulse)", function() {
     // Create an exchanges
-    var exchanges = new base.Exchanges({
+    var exchanges = new subject({
       title:              "Title for my Events",
       description:        "Test exchanges used for testing things only",
       exchangePrefix:     'v1/'
@@ -252,7 +252,7 @@ suite("Exchanges", function() {
   // Test that we can't declare too long routing keys
   test("error declare too long routing key", function() {
     // Create an exchanges
-    var exchanges = new base.Exchanges({
+    var exchanges = new subject({
       title:              "Title for my Events",
       description:        "Test exchanges used for testing things only"
     });
@@ -305,7 +305,7 @@ suite("Exchanges", function() {
   // Test that we can't declare two multipleWords entries in a routing key
   test("error declare two multipleWords routing key entries", function() {
     // Create an exchanges
-    var exchanges = new base.Exchanges({
+    var exchanges = new subject({
       title:              "Title for my Events",
       description:        "Test exchanges used for testing things only"
     });
@@ -357,7 +357,7 @@ suite("Exchanges", function() {
 
   test("declare (error without CCBuilder)", function() {
     // Create an exchanges
-    var exchanges = new base.Exchanges({
+    var exchanges = new subject({
       title:              "Title for my Events",
       description:        "Test exchanges used for testing things only"
     });

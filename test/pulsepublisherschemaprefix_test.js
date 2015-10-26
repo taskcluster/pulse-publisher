@@ -1,7 +1,9 @@
 suite("Exchanges (Publish on Pulse w. schemaPrefix)", function() {
   var assert  = require('assert');
-  var base    = require('../');
+  var subject = require('../');
+  var _validator = require('schema-validator-publisher');
   var config  = require('taskcluster-lib-config');
+  var stats   = require('taskcluster-lib-stats');
   var path    = require('path');
   var fs      = require('fs');
   var debug   = require('debug')('base:test:publish-pulse');
@@ -39,7 +41,7 @@ suite("Exchanges (Publish on Pulse w. schemaPrefix)", function() {
   var influx = null;
   var exchanges = null;
   setup(function() {
-    exchanges = new base.Exchanges({
+    exchanges = new subject({
       title:              "Title for my Events",
       description:        "Test exchanges used for testing things only",
       schemaPrefix:       'http://localhost:1203/'
@@ -87,14 +89,14 @@ suite("Exchanges (Publish on Pulse w. schemaPrefix)", function() {
       CCBuilder:          function() {return ["something.cced"];}
     });
     // Create validator to validate schema
-    var validator = new base.validator.Validator();
+    var validator = new _validator.Validator();
     // Load exchange-test-schema.json schema from disk
     var schemaPath = path.join(__dirname, 'schemas', 'exchange-test-schema.json');
     var schema = fs.readFileSync(schemaPath, {encoding: 'utf-8'});
     validator.register(JSON.parse(schema));
 
     // Create influx db connection for report statistics
-    influx = new base.stats.Influx({
+    influx = new stats.Influx({
       connectionString:   cfg.get('influxdb:connectionString')
     });
 
@@ -108,8 +110,8 @@ suite("Exchanges (Publish on Pulse w. schemaPrefix)", function() {
   // Test that we can connect to AMQP server
   test("connect", function() {
     return exchanges.connect().then(function(publisher) {
-      assert(publisher instanceof base.Exchanges.Publisher,
-             "Should get an instance of base.Exchanges.Publisher");
+      assert(publisher instanceof subject.Publisher,
+             "Should get an instance of exchanges.Publisher");
     });
   });
 
