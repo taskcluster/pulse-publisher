@@ -1,0 +1,14 @@
+{
+  "influxdb": {
+    "connectionString": "https://<user>:<pwd>@<host>:<port>/db/<database>"
+  },
+  "referenceTestBucket": "test-bucket-for-any-garbage",
+  "aws": {
+    "accessKeyId":        "...",
+    "secretAccessKey":    "..."
+  },
+  "pulse": {
+    "username":           "...",
+    "password":           "..."
+  }
+}
