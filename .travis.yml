@@ -1,10 +1,20 @@
+language: node_js
+sudo: false
+node_js:
+  - '0.12'
+  - '4'
+  - '5'
+addons:
+  apt:
+    sources:
+      - ubuntu-toolchain-r-test
+    packages:
+      - g++-4.8
+script: npm test
 env:
   global:
-  - DEBUG='* -superagent -express:* -mocha:*'
-language: node_js
-node_js:
-- '0.12'
-script: npm test
+    - DEBUG='* -superagent -express:* -mocha:*'
+    - CXX=g++-4.8
 before_install:
 - openssl aes-256-cbc -K $encrypted_b419eb31b74d_key -iv $encrypted_b419eb31b74d_iv
   -in taskcluster-base-test.conf.json.enc -out taskcluster-base-test.conf.json -d
