@@ -1,6 +1,6 @@
 {
   "name": "pulse-publisher",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "author": "Jonas Finnemann Jensen <jopsen@gmail.com>",
   "description": "pulse-publisher",
   "license": "MPL-2.0",
@@ -17,13 +17,14 @@
   "dependencies": {
     "ajv": "^3.8.5",
     "amqplib": "0.3.2",
-    "aws-sdk-promise": "0.0.0",
+    "aws-sdk-promise": "^0.0.2",
+    "aws-sdk": "^2.1.5",
     "babel-runtime": "^5.8.29",
     "debug": "2.0.0",
     "lodash": "2.4.1",
     "promise": "6.1.0",
     "slugid": "^1.1.0",
-    "taskcluster-lib-stats": "^0.8.7"
+    "taskcluster-lib-stats": "^0.8.8"
   },
   "devDependencies": {
     "babel-compile": "0.0.4",
