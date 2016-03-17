@@ -1,9 +1,9 @@
 suite("Exchanges (Publish on Pulse)", function() {
   var assert    = require('assert');
-  var _validator = require('schema-validator-publisher');
   var subject   = require('../');
   var config    = require('taskcluster-lib-config');
   var stats     = require('taskcluster-lib-stats');
+  var validator = require('taskcluster-lib-validate');
   var path      = require('path');
   var fs        = require('fs');
   var debug     = require('debug')('base:test:publish-pulse');
@@ -40,7 +40,7 @@ suite("Exchanges (Publish on Pulse)", function() {
 
   var influx = null;
   var exchanges = null;
-  setup(function() {
+  setup(async function() {
     exchanges = new subject({
       title:              "Title for my Events",
       description:        "Test exchanges used for testing things only"
@@ -87,12 +87,11 @@ suite("Exchanges (Publish on Pulse)", function() {
       routingKeyBuilder:  function(msg, rk) { return rk; },
       CCBuilder:          function() {return ["something.cced"];}
     });
-    // Create validator to validate schema
-    var validator = new _validator.Validator();
-    // Load exchange-test-schema.json schema from disk
-    var schemaPath = path.join(__dirname, 'schemas', 'exchange-test-schema.json');
-    var schema = fs.readFileSync(schemaPath, {encoding: 'utf-8'});
-    validator.register(JSON.parse(schema));
+
+    var validate = await validator({
+      folder:  path.join(__dirname, 'schemas'),
+      baseUrl: 'http://localhost:1203/'
+    });
 
     // Create influx db connection for report statistics
     influx = new stats.Influx({
@@ -101,7 +100,7 @@ suite("Exchanges (Publish on Pulse)", function() {
 
     // Set options on exchanges
     exchanges.configure({
-      validator:              validator,
+      validator:              validate,
       credentials:            cfg.get('pulse')
     });
   });

@@ -6,7 +6,7 @@ var _             = require('lodash');
 var Promise       = require('promise');
 var path          = require('path');
 var fs            = require('fs');
-var Validator     = require('schema-validator-publisher').Validator;
+var Ajv           = require('ajv');
 var aws           = require('aws-sdk-promise');
 var amqplib       = require('amqplib');
 var events        = require('events');
@@ -30,8 +30,7 @@ var ExchangeReports = new stats.Series({
 /** Class for publishing to a set of declared exchanges */
 var Publisher = function(conn, channel, entries, exchangePrefix, options) {
   events.EventEmitter.call(this);
-  assert(options.validator instanceof Validator,
-         "options.validator must be an instance of Validator");
+  assert(options.validator, "options.validator must be provided");
   this._conn = conn;
   this._channel = channel;
   this._entries = entries;
@@ -64,13 +63,11 @@ var Publisher = function(conn, channel, entries, exchangePrefix, options) {
       assert(CCs instanceof Array, "CCBuilder must return an array");
 
       // Validate against schema
-      var errors = that._options.validator.check(message, entry.schema);
-      if (errors) {
-        debug("Failed validate message: %j against schema: %s, errors: %j",
-              message, entry.schema, errors);
-        var error = new Error("Message validation failed");
-        error.errors = errors;
-        throw error;
+      var err = that._options.validator(message, entry.schema);
+      if (err) {
+        debug("Failed validate message: %j against schema: %s, error: %j",
+              message, entry.schema, err);
+        throw new Error("Message validation failed. " + err);
       }
 
       // Convert routingKey to string if needed
@@ -349,7 +346,7 @@ Exchanges.prototype.configure = function(options) {
  *   },
  *   connectionString:  '...',   // AMQP connection string, if not credentials
  *   exchangePrefix:    '...',   // Exchange prefix
- *   validator:                  // Instance of base.validator.Validator
+ *   validator:                  // Instance of base.validator
  *   drain:             new stats.Influx(...),  // Statistics drain
  *   component:         'queue'  // Component name in statistics
  *   process:           'server' // process name in statistics
@@ -375,8 +372,7 @@ Exchanges.prototype.connect = function(options) {
   assert(options.connectionString ||
          (options.credentials.username && options.credentials.password),
          "ConnectionString or credentials must be provided");
-  assert(options.validator instanceof Validator,
-         "An instance of base.validator.Validator must be given");
+  assert(options.validator, "A base.validator function must be provided.");
   if (options.drain) {
     assert(options.component, "component name for statistics is required");
     assert(options.process,   "process name for statistics is required");
@@ -494,20 +490,20 @@ Exchanges.prototype.reference = function(options) {
     })
   };
 
-  // Create validator to validate schema
-  var validator = new Validator();
+
+  var ajv = Ajv({useDefaults: 'clone', format: 'full', verbose: true, allErrors: true});
   // Load exchanges-reference.json schema from disk
   var schemaPath = path.join(__dirname, 'schemas', 'exchanges-reference.json');
   var schema = fs.readFileSync(schemaPath, {encoding: 'utf-8'});
-  validator.register(JSON.parse(schema));
+  var validate = ajv.compile(JSON.parse(schema));
 
   // Check against it
   var refSchema = 'http://schemas.taskcluster.net/base/v1/' +
                   'exchanges-reference.json#';
-  var errors = validator.check(reference, refSchema);
-  if (errors) {
+  var valid = validate(reference, refSchema);
+  if (!valid) {
     debug("Exchanges.references(): Failed to validate against schema, " +
-          "errors: %j reference: %j", errors, reference);
+          "errors: %j reference: %j", validate.errors, reference);
     throw new Error("API.references(): Failed to validate against schema");
   }
 
