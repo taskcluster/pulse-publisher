@@ -1,26 +1,24 @@
 suite("Exchanges (Publish on Pulse)", function() {
-  var assert    = require('assert');
-  var subject   = require('../');
-  var config    = require('taskcluster-lib-config');
-  var stats     = require('taskcluster-lib-stats');
-  var validator = require('taskcluster-lib-validate');
-  var path      = require('path');
-  var fs        = require('fs');
-  var debug     = require('debug')('base:test:publish-pulse');
-  var Promise   = require('promise');
-  var slugid    = require('slugid');
-  var amqplib   = require('amqplib');
+  var assert     = require('assert');
+  var subject    = require('../');
+  var config     = require('taskcluster-lib-config');
+  var monitoring = require('taskcluster-lib-monitor');
+  var validator  = require('taskcluster-lib-validate');
+  var path       = require('path');
+  var fs         = require('fs');
+  var debug      = require('debug')('base:test:publish-pulse');
+  var Promise    = require('promise');
+  var slugid     = require('slugid');
+  var amqplib    = require('amqplib');
+  var _          = require('lodash');
 
   // Load necessary configuration
   var cfg = config({
-    envs: [
-      'influxdb_connectionString',
-    ],
+    envs: [],
     filename:               'taskcluster-base-test'
   });
 
-  if (!cfg.get('influxdb:connectionString') &&
-      !cfg.get('pulse:credentials:password')) {
+  if (!cfg.get('pulse:password')) {
     throw new Error("Skipping 'pulse publisher', missing config file: " +
                     "taskcluster-base-test.conf.json");
     return;
@@ -38,7 +36,7 @@ suite("Exchanges (Publish on Pulse)", function() {
     5671                // Port for SSL
   ].join('');
 
-  var influx = null;
+  var monitor = null;
   var exchanges = null;
   setup(async function() {
     exchanges = new subject({
@@ -93,9 +91,10 @@ suite("Exchanges (Publish on Pulse)", function() {
       baseUrl: 'http://localhost:1203/'
     });
 
-    // Create influx db connection for report statistics
-    influx = new stats.Influx({
-      connectionString:   cfg.get('influxdb:connectionString')
+    monitor = await monitoring({
+      project: 'pulse-publisher',
+      credentials: {},
+      mock: true,
     });
 
     // Set options on exchanges
@@ -362,11 +361,9 @@ suite("Exchanges (Publish on Pulse)", function() {
 
   // Test that we record statistics
   test("publish message (record statistics)", function() {
-    assert(influx.pendingPoints() === 0, "We shouldn't have any points");
+    assert(_.keys(monitor.counts).length === 0, "We shouldn't have any points");
     return exchanges.connect({
-      drain:                  influx,
-      component:              'taskcluster-base-test',
-      process:                'mocha'
+      monitor,
     }).then(function(publisher) {
       return publisher.testExchange({someString: "My message"}, {
         testId:           "myid",
@@ -374,7 +371,7 @@ suite("Exchanges (Publish on Pulse)", function() {
         state:            undefined // Optional
       });
     }).then(function() {
-      assert(influx.pendingPoints() === 1, "We should have one point");
+      assert(_.keys(monitor.counts).length === 1, "We should have one point");
     });
   });
 });

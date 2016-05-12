@@ -13,7 +13,7 @@ addons:
 script: npm test
 env:
   global:
-    - DEBUG='* -superagent -express:* -mocha:*'
+    - DEBUG='* -superagent -express:* -mocha:* -babel'
     - CXX=g++-4.8
 before_install:
 - openssl aes-256-cbc -K $encrypted_b419eb31b74d_key -iv $encrypted_b419eb31b74d_iv

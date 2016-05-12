@@ -11,21 +11,7 @@ var aws           = require('aws-sdk-promise');
 var amqplib       = require('amqplib');
 var events        = require('events');
 var util          = require('util');
-var stats         = require('taskcluster-lib-stats');
-
-/** Exchange reports for statistics */
-var ExchangeReports = new stats.Series({
-  name:               'ExchangeReports',
-  columns: {
-    component:        stats.types.String, // Component name (e.g. 'queue')
-    process:          stats.types.String, // Process name (e.g. 'server')
-    duration:         stats.types.Number, // Time it took to send the message
-    routingKeys:      stats.types.Number, // 1 + number CCed routing keys
-    payloadSize:      stats.types.Number, // Size of message bytes
-    exchange:         stats.types.String, // true || false
-    error:            stats.types.String  // true || false
-  }
-});
+var monitoring    = require('taskcluster-lib-monitor');
 
 /** Class for publishing to a set of declared exchanges */
 var Publisher = function(conn, channel, entries, exchangePrefix, options) {
@@ -35,10 +21,16 @@ var Publisher = function(conn, channel, entries, exchangePrefix, options) {
   this._channel = channel;
   this._entries = entries;
   this._options = options;
-  if (options.drain) {
-    assert(options.component, "component name for statistics is required");
-    assert(options.process,   "process name for statistics is required");
-    this._reporter = ExchangeReports.reporter(options.drain);
+  if (options.drain || options.component) {
+    console.log('taskcluster-lib-stats is now deprecated!\n' +
+                'Use the `monitor` option rather than `drain`.\n' +
+                '`monitor` should be an instance of taskcluster-lib-monitor.\n' +
+                '`component` is no longer needed. Prefix your `monitor` before use.');
+  }
+
+  var monitor = null;
+  if (options.monitor) {
+    monitor = options.monitor;
   }
 
   var that = this;
@@ -113,7 +105,7 @@ var Publisher = function(conn, channel, entries, exchangePrefix, options) {
       return new Promise(function(accept, reject) {
         // Start timer
         var start = null;
-        if (that._reporter) {
+        if (monitor) {
           start = process.hrtime();
         }
 
@@ -124,20 +116,10 @@ var Publisher = function(conn, channel, entries, exchangePrefix, options) {
           contentEncoding:    'utf-8',
           CC:                 CCs
         }, function(err, val) {
-          if (that._reporter) {
-            // Get duration
+          if (monitor) {
             var d = process.hrtime(start);
-
-            // Report statistics
-            that._reporter({
-              component:      options.component,
-              process:        options.process,
-              duration:       d[0] * 1000 + (d[1] / 1000000),
-              routingKeys:    1 + CCs.length,
-              payloadSize:    payload.length,
-              exchange:       exchange,
-              error:          (err ? 'true' : 'false'),
-            });
+            monitor.measure(exchange, d[0] * 1000 + (d[1] / 1000000));
+            monitor.count(exchange);
           }
 
           // Handle errors
@@ -347,9 +329,7 @@ Exchanges.prototype.configure = function(options) {
  *   connectionString:  '...',   // AMQP connection string, if not credentials
  *   exchangePrefix:    '...',   // Exchange prefix
  *   validator:                  // Instance of base.validator
- *   drain:             new stats.Influx(...),  // Statistics drain
- *   component:         'queue'  // Component name in statistics
- *   process:           'server' // process name in statistics
+ *   monitor:           await require('taskcluster-lib-monitor')({...}),
  * }
  *
  * This method will connect to AMQP server and return a instance of Publisher.
@@ -373,10 +353,6 @@ Exchanges.prototype.connect = function(options) {
          (options.credentials.username && options.credentials.password),
          "ConnectionString or credentials must be provided");
   assert(options.validator, "A base.validator function must be provided.");
-  if (options.drain) {
-    assert(options.component, "component name for statistics is required");
-    assert(options.process,   "process name for statistics is required");
-  }
 
   // Find exchange prefix, may be further prefixed if pulse credentials
   // are given
