@@ -30,7 +30,7 @@ var Publisher = function(conn, channel, entries, exchangePrefix, options) {
 
   var monitor = null;
   if (options.monitor) {
-    monitor = options.monitor.prefix('pulse-publisher');
+    monitor = options.monitor;
   }
 
   var that = this;
