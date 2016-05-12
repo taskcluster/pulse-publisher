@@ -117,19 +117,9 @@ var Publisher = function(conn, channel, entries, exchangePrefix, options) {
           CC:                 CCs
         }, function(err, val) {
           if (monitor) {
-            // Get duration
             var d = process.hrtime(start);
-
-            var success = 'success';
-            if (err) {
-              success = 'error';
-            }
-
-            for (let stat of [success, 'all']) {
-              var k = [exchange, stat].join('.');
-              monitor.measure(k, d[0] * 1000 + (d[1] / 1000000));
-              monitor.count(k);
-            }
+            monitor.measure(exchange, d[0] * 1000 + (d[1] / 1000000));
+            monitor.count(exchange);
           }
 
           // Handle errors

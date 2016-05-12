@@ -371,7 +371,7 @@ suite("Exchanges (Publish on Pulse)", function() {
         state:            undefined // Optional
       });
     }).then(function() {
-      assert(_.keys(monitor.counts).length === 2, "We should have two points");
+      assert(_.keys(monitor.counts).length === 1, "We should have one point");
     });
   });
 });
