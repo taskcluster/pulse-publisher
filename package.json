@@ -31,8 +31,8 @@
     "babel-preset-taskcluster": "^2.3.0",
     "mocha": "2.5.3",
     "source-map-support": "^0.4.0",
-    "taskcluster-lib-config": "^0.9.1",
-    "taskcluster-lib-validate": "^1.0.1"
+    "taskcluster-lib-validate": "^1.0.1",
+    "typed-env-config": "^0.10.1"
   },
   "main": "./lib/exchanges.js"
 }

@@ -1,7 +1,7 @@
 suite("Exchanges (Publish on Pulse w. schemaPrefix)", function() {
   var assert     = require('assert');
   var subject    = require('../');
-  var config     = require('taskcluster-lib-config');
+  var config     = require('typed-env-config');
   var monitoring = require('taskcluster-lib-monitor');
   var validator  = require('taskcluster-lib-validate');
   var path       = require('path');
@@ -11,26 +11,21 @@ suite("Exchanges (Publish on Pulse w. schemaPrefix)", function() {
   var slugid     = require('slugid');
   var amqplib    = require('amqplib');
 
-  // Load necessary configuration
-  var cfg = config({
-    envs: [],
-    filename:               'taskcluster-base-test'
-  });
+  var cfg = config({});
 
-  if (!cfg.get('pulse:password')) {
-    throw new Error("Skipping 'pulse publisher', missing config file: " +
-                    "taskcluster-base-test.conf.json");
+  if (!cfg.pulse.password) {
+    throw new Error("Skipping 'pulse publisher', missing config file: user-config.yml");
     return;
   }
 
   // ConnectionString for use with amqplib only
   var connectionString = [
     'amqps://',         // Ensure that we're using SSL
-    cfg.get('pulse:username'),
+    cfg.pulse.username,
     ':',
-    cfg.get('pulse:password'),
+    cfg.pulse.password,
     '@',
-    cfg.get('pulse:hostname') || 'pulse.mozilla.org',
+    cfg.pulse.hostname || 'pulse.mozilla.org',
     ':',
     5671                // Port for SSL
   ].join('');
@@ -100,7 +95,7 @@ suite("Exchanges (Publish on Pulse w. schemaPrefix)", function() {
     // Set options on exchanges
     exchanges.configure({
       validator:              validate,
-      credentials:            cfg.get('pulse')
+      credentials:            cfg.pulse
     });
   });
 

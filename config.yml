@@ -1,0 +1,9 @@
+---
+defaults:
+  referenceTestBucket:        "test-bucket-for-any-garbage"
+  aws:
+    accessKeyId:              !env AWS_ACCESS_KEY_ID
+    secretAccessKey:          !env AWS_SECRET_ACCESS_KEY
+  pulse:
+    username:                 !env PULSE_USERNAME
+    password:                 !env PULSE_PASSWORD
