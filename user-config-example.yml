@@ -1,0 +1,9 @@
+---
+defaults:
+  referenceTestBucket: "..."
+  aws:
+    accessKeyId:        "..."
+    secretAccessKey:    "..."
+  pulse:
+    username:           "..."
+    password:           "..."
