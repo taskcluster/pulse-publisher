@@ -1,0 +1,8 @@
+defaults:
+  testBucket: "test-bucket-for-any-garbage"
+  aws:
+    accessKeyId:      "..."
+    secretAccessKey:  "..."
+  pulse:
+    username: "..."
+    password: "..."

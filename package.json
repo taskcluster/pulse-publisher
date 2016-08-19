@@ -24,15 +24,16 @@
     "lodash": "2.4.1",
     "promise": "6.1.0",
     "slugid": "^1.1.0",
-    "taskcluster-lib-monitor": "^1.0.0"
   },
   "devDependencies": {
+    "taskcluster-lib-monitor": "^1.0.0",
     "babel-compile": "^2.0.0",
     "babel-preset-taskcluster": "^2.3.0",
     "mocha": "2.0.1",
     "source-map-support": "^0.4.0",
     "taskcluster-lib-config": "^0.8.8",
-    "taskcluster-lib-validate": "^0.4.2"
+    "taskcluster-lib-validate": "^0.4.2",
+    "typed-env-config": "^1.0.0"
   },
   "main": "./lib/exchanges.js"
 }

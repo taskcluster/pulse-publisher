@@ -1,24 +1,15 @@
 suite("Exchanges", function() {
   var assert  = require('assert');
   var subject = require('../');
-  var config  = require('taskcluster-lib-config');
+  var config  = require('typed-env-config');
   var aws     = require('aws-sdk-promise');
 
   test("publish", function() {
-    var cfg = config({
-      envs: [
-        'aws_accessKeyId',
-        'aws_secretAccessKey',
-        'aws_region',
-        'aws_apiVersion',
-        'referenceTestBucket'
-      ],
-      filename:               'taskcluster-base-test'
-    });
+    var cfg = config({});
 
-    if (!cfg.get('aws') || !cfg.get('referenceTestBucket')) {
+    if (!cfg.aws.secretAccessKey || !cfg.testBucket) {
       throw new Error("Skipping 'publish', missing config file: " +
-                      "taskcluster-base-test.conf.json");
+                      "user-config.yml");
     }
 
     // Create an exchanges
@@ -68,14 +59,14 @@ suite("Exchanges", function() {
     // Publish
     return exchanges.publish({
       referencePrefix:      'base/test/exchanges.json',
-      referenceBucket:      cfg.get('referenceTestBucket'),
-      aws:                  cfg.get('aws')
+      referenceBucket:      cfg.testBucket,
+      aws:                  cfg.aws
     }).then(function() {
       // Get the file... we don't bother checking the contents this is good
       // enough
-      var s3 = new aws.S3(cfg.get('aws'));
+      var s3 = new aws.S3(cfg.aws);
       return s3.getObject({
-        Bucket:     cfg.get('referenceTestBucket'),
+        Bucket:     cfg.testBucket,
         Key:        'base/test/exchanges.json'
       }).promise();
     }).then(function(res) {

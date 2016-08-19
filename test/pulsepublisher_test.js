@@ -1,37 +1,34 @@
 suite("Exchanges (Publish on Pulse)", function() {
   var assert     = require('assert');
   var subject    = require('../');
-  var config     = require('taskcluster-lib-config');
+  var config     = require('typed-env-config');
   var monitoring = require('taskcluster-lib-monitor');
   var validator  = require('taskcluster-lib-validate');
   var path       = require('path');
   var fs         = require('fs');
-  var debug      = require('debug')('base:test:publish-pulse');
+  var debug      = require('debug')('test');
   var Promise    = require('promise');
   var slugid     = require('slugid');
   var amqplib    = require('amqplib');
   var _          = require('lodash');
 
   // Load necessary configuration
-  var cfg = config({
-    envs: [],
-    filename:               'taskcluster-base-test'
-  });
+  var cfg = config({});
 
-  if (!cfg.get('pulse:password')) {
+  if (!cfg.pulse.password) {
     throw new Error("Skipping 'pulse publisher', missing config file: " +
-                    "taskcluster-base-test.conf.json");
+                    "user-config.yml");
     return;
   }
 
   // ConnectionString for use with amqplib only
   var connectionString = [
     'amqps://',         // Ensure that we're using SSL
-    cfg.get('pulse:username'),
+    cfg.pulse.username,
     ':',
-    cfg.get('pulse:password'),
+    cfg.pulse.password,
     '@',
-    cfg.get('pulse:hostname') || 'pulse.mozilla.org',
+    cfg.pulse.hostname || 'pulse.mozilla.org',
     ':',
     5671                // Port for SSL
   ].join('');
@@ -100,7 +97,7 @@ suite("Exchanges (Publish on Pulse)", function() {
     // Set options on exchanges
     exchanges.configure({
       validator:              validate,
-      credentials:            cfg.get('pulse')
+      credentials:            cfg.pulse
     });
   });
 
@@ -278,7 +275,7 @@ suite("Exchanges (Publish on Pulse)", function() {
   test("publish message (and receive)", function() {
     var conn,
         channel,
-        queue = 'queue/' + cfg.get('pulse:username') + '/test/' + slugid.v4();
+        queue = 'queue/' + cfg.pulse.username + '/test/' + slugid.v4();
     var messages = [];
     return amqplib.connect(connectionString).then(function(conn_) {
       conn = conn_;
@@ -291,7 +288,7 @@ suite("Exchanges (Publish on Pulse)", function() {
         autoDelete: true,
       });
     }).then(function() {
-      var testExchange = 'exchange/' + cfg.get('pulse:username') +
+      var testExchange = 'exchange/' + cfg.pulse.username +
                          '/test-exchange';
       return channel.bindQueue(queue, testExchange, 'myid.#');
     }).then(function() {
@@ -320,7 +317,7 @@ suite("Exchanges (Publish on Pulse)", function() {
   test("publish message (and receive by CC)", function() {
     var conn,
         channel,
-        queue = 'queue/' + cfg.get('pulse:username') + '/test/' + slugid.v4();
+        queue = 'queue/' + cfg.pulse.username + '/test/' + slugid.v4();
     var messages = [];
     return amqplib.connect(connectionString).then(function(conn_) {
       conn = conn_;
@@ -333,7 +330,7 @@ suite("Exchanges (Publish on Pulse)", function() {
         autoDelete: true,
       });
     }).then(function() {
-      var testExchange = 'exchange/' + cfg.get('pulse:username') +
+      var testExchange = 'exchange/' + cfg.pulse.username +
                          '/test-exchange';
       return Promise.all([
         channel.bindQueue(queue, testExchange, 'something.cced')
