@@ -11,7 +11,6 @@ var aws           = require('aws-sdk-promise');
 var amqplib       = require('amqplib');
 var events        = require('events');
 var util          = require('util');
-var monitoring    = require('taskcluster-lib-monitor');
 
 /** Class for publishing to a set of declared exchanges */
 var Publisher = function(conn, channel, entries, exchangePrefix, options) {
@@ -554,4 +553,3 @@ module.exports = Exchanges;
 
 // Export reference to Publisher
 Exchanges.Publisher = Publisher;
-
