@@ -342,7 +342,7 @@ Exchanges.prototype.configure = function(options) {
  *
  * Return a promise for an instance of `Publisher`.
  */
-Exchanges.prototype.connect = function(options) {
+Exchanges.prototype.connect = async function(options) {
   options = _.defaults({}, options || {}, this._options, {
     credentials:        {}
   });
@@ -383,30 +383,43 @@ Exchanges.prototype.connect = function(options) {
   var entries = _.cloneDeep(this._entries);
 
   // Create connection
-  var conn = null;
-  var channel = null;
-  return amqplib.connect(options.connectionString, {
-    // Disable TCP Nagle, test don't show any difference in performance, but
-    // it probably can't hurt to disable Nagle, this is a low bandwidth
-    // application, so it makes a lot of sense to disable Nagle.
-    noDelay:          true
-  }).then(function(conn_) {
-    conn = conn_;
-    return conn.createConfirmChannel();
-  }).then(function(channel_) {
-    channel = channel_;
-
-    return Promise.all(entries.map(function(entry) {
-      var name = exchangePrefix + entry.exchange;
-      return channel.assertExchange(name, 'topic', {
-        durable:      options.durableExchanges,
-        internal:     false,
-        autoDelete:   false
+  let conn;
+  let retry = 0;
+  while (true) {
+    // Try to connect a few times, as DNS randomization is used to ensure we try
+    // different nodes
+    try {
+      conn = await amqplib.connect(options.connectionString, {
+        // Disable TCP Nagle, test don't show any difference in performance, but
+        // it probably can't hurt to disable Nagle, this is a low bandwidth
+        // application, so it makes a lot of sense to disable Nagle.
+        noDelay: true,
+        timeout: 30 * 1000,
       });
-    }));
-  }).then(function() {
-    return new Publisher(conn, channel, entries, exchangePrefix, options);
-  });
+    } catch (err) {
+      if (retry++ < 12) {
+        continue; // try again
+      }
+      throw err;
+    }
+    break;
+  }
+
+  // Create confirm publish channel
+  var channel = await conn.createConfirmChannel();
+
+  // Create exchanges as declared
+  await Promise.all(entries.map(function(entry) {
+    var name = exchangePrefix + entry.exchange;
+    return channel.assertExchange(name, 'topic', {
+      durable:      options.durableExchanges,
+      internal:     false,
+      autoDelete:   false
+    });
+  }));
+
+  // return publisher
+  return new Publisher(conn, channel, entries, exchangePrefix, options);
 };
 
 /**
