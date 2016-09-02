@@ -70,7 +70,7 @@ suite("Exchanges", function() {
         Key:        'base/test/exchanges.json'
       }).promise();
     }).then(function(res) {
-      var reference = JSON.parse(res.data.Body);
+      var reference = JSON.parse(res.Body);
       assert(reference.entries, "Missing entries");
       assert(reference.entries.length > 0, "Has no entries");
       assert(reference.title, "Missing title");
