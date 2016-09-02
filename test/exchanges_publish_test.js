@@ -2,7 +2,7 @@ suite("Exchanges", function() {
   var assert  = require('assert');
   var subject = require('../');
   var config  = require('typed-env-config');
-  var aws     = require('aws-sdk-promise');
+  var aws     = require('aws-sdk');
 
   test("publish", function() {
     var cfg = config({});
