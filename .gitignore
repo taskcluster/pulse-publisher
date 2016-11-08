@@ -2,3 +2,4 @@
 node_modules/
 .vagrant/
 /user-config.yml
+lib/
