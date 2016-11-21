@@ -76,6 +76,10 @@ exchanges.declare({
   },
 });
 
+// Note you can declare multiple exchanges, by calling exchanges.declare again.
+// Nothing happens on AMQP before exchanges.connect() is called. This just declares
+// the code in JS.
+
 // Some where in your app, instantiate a publisher
 let publisher = await exchanges.connect({
   credentials: {username: '...', password: '...'},
@@ -83,6 +87,9 @@ let publisher = await exchanges.connect({
   validator: await require('taskcluster-lib-validate')(), // instance of taskcluster-lib-validate
   monitor: undefined, // optional instance of taskcluster-lib-monitor
 });
+
+// Send a message to the declared testExchange
+await publisher.testExchange({someIdentifier: '...', routes: [], ...});
 
 // Docs can also be generated with exchange.reference(), see source code docs for details.
 ```
