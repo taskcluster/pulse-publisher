@@ -9,6 +9,7 @@ A collection of utilities for interacting with Mozilla's [Pulse](https://pulsegu
 This is tested on and should run on any of node `{0.12, 4, 5}`.
 
 ## Usage
+The source-code contain additional comments for each method.
 
 ```js
 // Exchanges are typically declared in a file like exchanges.js
