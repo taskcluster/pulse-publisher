@@ -479,7 +479,7 @@ Exchanges.prototype.reference = function(options) {
   };
 
 
-  var ajv = Ajv({useDefaults: 'clone', format: 'full', verbose: true, allErrors: true});
+  var ajv = Ajv({useDefaults: true, format: 'full', verbose: true, allErrors: true});
   // Load exchanges-reference.json schema from disk
   var schemaPath = path.join(__dirname, 'schemas', 'exchanges-reference.json');
   var schema = fs.readFileSync(schemaPath, {encoding: 'utf-8'});

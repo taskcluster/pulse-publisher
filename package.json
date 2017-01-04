@@ -1,6 +1,6 @@
 {
   "name": "pulse-publisher",
-  "version": "2.0.0",
+  "version": "1.1.3",
   "author": "Jonas Finnemann Jensen <jopsen@gmail.com>",
   "description": "pulse-publisher",
   "license": "MPL-2.0",
@@ -10,12 +10,15 @@
     "pretest": "npm run compile",
     "test": "mocha .test/*_test.js"
   },
+  "files": [
+    "lib"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/taskcluster/pulse-publisher.git"
   },
   "dependencies": {
-    "ajv": "^3.8.5",
+    "ajv": "^4.8.2",
     "amqplib": "^0.4.1",
     "aws-sdk": "^2.5.3",
     "babel-runtime": "^6.0.0",
