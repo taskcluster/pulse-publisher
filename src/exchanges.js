@@ -20,6 +20,7 @@ var Publisher = function(conn, channel, entries, exchangePrefix, options) {
   this._channel = channel;
   this._entries = entries;
   this._options = options;
+  this._closing = false;
   if (options.drain || options.component) {
     console.log('taskcluster-lib-stats is now deprecated!\n' +
                 'Use the `monitor` option rather than `drain`.\n' +
@@ -32,16 +33,31 @@ var Publisher = function(conn, channel, entries, exchangePrefix, options) {
     monitor = options.monitor;
   }
 
-  var that = this;
-  this._channel.on('error', function(err) {
+  this._channel.on('error', (err) => {
     debug("Channel error in Publisher: ", err.stack);
-    that.emit('error', err);
+    this.emit('error', err);
   });
-  this._conn.on('error', function(err) {
+  this._conn.on('error', (err) => {
     debug("Connection error in Publisher: ", err.stack);
-    that.emit('error', err);
+    this.emit('error', err);
+  });
+  // Handle graceful server initiated shutdown as an error
+  this._channel.on('close', () => {
+    if (this._closing) {
+      return;
+    }
+    debug('Channel closed unexpectedly');
+    this.emit('error', new Error('channel closed unexpectedly'));
+  });
+  this._conn.on('close', () => {
+    if (this._closing) {
+      return;
+    }
+    debug('Connection closed unexpectedly');
+    this.emit('error', new Error('connection closed unexpectedly'));
   });
 
+  var that = this;
   entries.forEach(function(entry) {
     that[entry.name] = function() {
       // Copy arguments
@@ -139,6 +155,7 @@ util.inherits(Publisher, events.EventEmitter);
 
 /** Close the connection */
 Publisher.prototype.close = function() {
+  this._closing = true;
   return this._conn.close();
 };
 
