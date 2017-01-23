@@ -80,7 +80,7 @@ suite("Exchanges (Publish on Pulse)", function() {
       schema:             'http://localhost:1203/exchange-test-schema.json#',
       messageBuilder:     function(msg) { return msg; },
       routingKeyBuilder:  function(msg, rk) { return rk; },
-      CCBuilder:          function() {return ["something.cced"];}
+      CCBuilder:          function(msg, rk, cc = []) {return cc;}
     });
 
     var validate = await validator({
@@ -347,12 +347,37 @@ suite("Exchanges (Publish on Pulse)", function() {
           testId:           "myid",
           taskRoutingKey:   "some.string.with.dots",
           state:            undefined // Optional
-        });
+        }, ['something.cced']);
       });
     }).then(function() {
       return new Promise(function(accept) {setTimeout(accept, 300);});
     }).then(function() {
       assert(messages.length === 1, "Didn't get exactly one message");
+    });
+  });
+
+  // Test that we can publish messages with large CC
+  test("publish message (huge CC)", function() {
+    return exchanges.connect().then(function(publisher) {
+      return publisher.testExchange({someString: "My message"}, {
+        testId:           "myid",
+        taskRoutingKey:   "some.string.with.dots",
+        state:            undefined // Optional
+      }, [
+        "route.index.gecko.v2.mozilla-aurora.revision.4b053b4106a9b99268312c5fcf8ac1048cc80430.firefox-l10n.linux64-opt.son",
+        "route.index.gecko.v2.mozilla-aurora.pushdate.2017.01.23.20170123201356.firefox-l10n.linux64-opt.son",
+        "route.index.gecko.v2.mozilla-aurora.latest.firefox-l10n.linux64-opt.son",
+        "route.index.gecko.v2.mozilla-aurora.revision.4b053b4106a9b99268312c5fcf8ac1048cc80430.firefox-l10n.linux64-opt.sq",
+        "route.index.gecko.v2.mozilla-aurora.pushdate.2017.01.23.20170123201356.firefox-l10n.linux64-opt.sq",
+        "route.index.gecko.v2.mozilla-aurora.latest.firefox-l10n.linux64-opt.sq",
+        "route.index.gecko.v2.mozilla-aurora.revision.4b053b4106a9b99268312c5fcf8ac1048cc80430.firefox-l10n.linux64-opt.sr",
+        "route.index.gecko.v2.mozilla-aurora.pushdate.2017.01.23.20170123201356.firefox-l10n.linux64-opt.sr",
+        "route.index.gecko.v2.mozilla-aurora.latest.firefox-l10n.linux64-opt.sr",
+        "route.index.gecko.v2.mozilla-aurora.revision.4b053b4106a9b99268312c5fcf8ac1048cc80430.firefox-l10n.linux64-opt.sv-SE",
+        "route.index.gecko.v2.mozilla-aurora.pushdate.2017.01.23.20170123201356.firefox-l10n.linux64-opt.sv-SE",
+        "route.index.gecko.v2.mozilla-aurora.latest.firefox-l10n.linux64-opt.sv-SE",
+        "route.index.gecko.v2.mozilla-aurora.revision.4b053b4106a9b99268312c5fcf8ac1048cc80430.firefox-l10n.linux64-opt.ta",
+      ]);
     });
   });
 
