@@ -1,32 +1,36 @@
 language: node_js
 sudo: false
 node_js:
-  - '0.12'
-  - '4'
-  - '6'
+- '0.12'
+- '4'
+- '6'
 addons:
   apt:
     sources:
-      - ubuntu-toolchain-r-test
+    - ubuntu-toolchain-r-test
     packages:
-      - g++-4.8
+    - g++-4.8
 script: npm test
 env:
   global:
-    - DEBUG='* -superagent -express:* -mocha:* -babel'
-    - CXX=g++-4.8
-
-# encrpyt channel name to get around issue
-# https://github.com/travis-ci/travis-ci/issues/1094
+  - DEBUG='* -superagent -express:* -mocha:* -babel'
+  - CXX=g++-4.8
 notifications:
   irc:
     channels:
-      # encrpyted string was "irc.mozilla.org#taskcluster-bots"
-      - secure: "K3cbtuUTxNzKVPTlWd4/LqvzC2NdbTNGKV6+/L30Suk0BbptY781Iy9RyyDglz07DgCRD83OxH47Uxo9zE48KTmL95mkJAiWB+fLSoLILLUgOq/tDtG41hQB5WMrgyoZD0FNLHzqBzdwDm4SQNcez50dLRmY88orCx9ginpYo8XxVhen3DiO136Lgoh50FeN/7wALfKJIIYZX/3h3/YoqLcwzSV0lq1zs7Ej5sF8H+5gnhETw9C0B2jWiZWCOTBBplIbOcfixv/fDXghDDKs6OSKu6n5ylES2QbJ+Wir9hAXTjSMg1vde8gd5//jJkAM2uawYOxFsqGO+LBJqS++z9SU0ccngwayFynHuFwy5lmrEZdA2Sy08sVq63qY5cDdrr+294h6H1fj2o6H5TsSMr7bmMpE5NqkksMRGlSBzoolfBE78REA/YGsJNc4Ir3zWa1ovR8/kMg23QaK57vP0JuLhLNcJYNC/spXAnlem5lzgqI0S21uh2UptuFpH7u16JnjpMM+kNX0WOddiJ73oB88FNHtumjsrhTjcLnZE/Z6zt9ZcYgm8UPgNEwMFLnTlIrrhdn7G1CZMscosM7oclWLRKdrixY/BDvxMMNSpFInLGcdS2JFDFu1iN/fpJFBr2+mcZTTDhZYq4t1D9ks4DY5xH8CH/hYxXp1MZFxSz4="
+    - secure: K3cbtuUTxNzKVPTlWd4/LqvzC2NdbTNGKV6+/L30Suk0BbptY781Iy9RyyDglz07DgCRD83OxH47Uxo9zE48KTmL95mkJAiWB+fLSoLILLUgOq/tDtG41hQB5WMrgyoZD0FNLHzqBzdwDm4SQNcez50dLRmY88orCx9ginpYo8XxVhen3DiO136Lgoh50FeN/7wALfKJIIYZX/3h3/YoqLcwzSV0lq1zs7Ej5sF8H+5gnhETw9C0B2jWiZWCOTBBplIbOcfixv/fDXghDDKs6OSKu6n5ylES2QbJ+Wir9hAXTjSMg1vde8gd5//jJkAM2uawYOxFsqGO+LBJqS++z9SU0ccngwayFynHuFwy5lmrEZdA2Sy08sVq63qY5cDdrr+294h6H1fj2o6H5TsSMr7bmMpE5NqkksMRGlSBzoolfBE78REA/YGsJNc4Ir3zWa1ovR8/kMg23QaK57vP0JuLhLNcJYNC/spXAnlem5lzgqI0S21uh2UptuFpH7u16JnjpMM+kNX0WOddiJ73oB88FNHtumjsrhTjcLnZE/Z6zt9ZcYgm8UPgNEwMFLnTlIrrhdn7G1CZMscosM7oclWLRKdrixY/BDvxMMNSpFInLGcdS2JFDFu1iN/fpJFBr2+mcZTTDhZYq4t1D9ks4DY5xH8CH/hYxXp1MZFxSz4=
     on_success: change
     on_failure: always
     template:
-      - "%{repository}#%{build_number} (%{branch} - %{commit} : %{author}): %{message}"
-      - "Change view : %{compare_url}"
-      - "Build details : %{build_url}"
-      - "Commit message : %{commit_message}"
+    - "%{repository}#%{build_number} (%{branch} - %{commit} : %{author}): %{message}"
+    - 'Change view : %{compare_url}'
+    - 'Build details : %{build_url}'
+    - 'Commit message : %{commit_message}'
+deploy:
+  provider: npm
+  email: taskcluster-accounts@mozilla.com
+  api_key:
+    secure: rnaVuDEqR+vY169hdpc+m7kHMowL3NRpGc+kAvCZ5HfPvGRt0N2GAUOJO5a44naEueCViHv+jeT0HfCC2Ao7OUAzko/s5eFy9ZoB+VDyeM4Fzmg/LgFcDqylt+X32ffVFvx0oOTXgxDXMiliSS4w4ujWxpwEyL+uvt2T6spkdEBFu9TwPZvsQN4IU/HlsQHPZaQVSYNJZfkt6lKU1W3QyWVNeYntX3UWSimkbgh/bI3OJo3Mff31FGodC56jxU54a0Gbr+GTl0b1hprzjp3+mQutAqZIGd7hqUMLauEzuRoxmM2kh0cRCJM23i/kfeTvasBMu9SVqpRGUZDWsl/CwqoeZSlHkZR224fvs0PGJ5SUsabLQuH+xfdMSFoUS/xwz3EVCwzcq9QagcAYwK9ZrCxqir+hfonZroXKOMqFRHqRmMYCB3Cgd6JQe9ii8c50Pw9EVzfqtzOyzbJmbACBvjJC/AJpRJO5aWBqcvlrJks+1488G3Y4UsswXPE/YOkSSA0pH7XhjA1e4qdiiJQACNb80hzek6JdwOyvl2iECClhKUVSi3nUmixNwo/5+Q1PthWx1QcfJhmWpqccD5rph2nuchZw9o4Vu+936ukVsHbB3dXCDUqdq+i87BSQXtUQgrYDvZLHdiC5ivfmgvZg0ytzoygCtGGU7MBAj4mn3LM=
+  on:
+    tags: true
+    repo: taskcluster/pulse-publisher
