@@ -6,7 +6,7 @@ A collection of utilities for interacting with Mozilla's [Pulse](https://pulsegu
 
 ## Requirements
 
-This is tested on and should run on any of node `{0.12, 4, 5}`.
+This is tested on and should run on any of node `{0.12, 4, 6, 7}`.
 
 ## Usage
 The source-code contain additional comments for each method.
@@ -96,7 +96,7 @@ await publisher.testExchange({someIdentifier: '...', routes: [], ...});
 ```
 
 ## Testing
-You'll need to fill a file called `taskcluster-base-test.conf.json` with valid keys. There is a `taskcluster-base-test-example.conf.json` you can copy over to see which keys are needed. Then it is just a matter of `npm install` and `npm test`.
+You'll need to fill a file called `user-config.yml` with valid keys. There is a `user-config-exaemple.yml` you can copy over to see which keys are needed. Then it is just a matter of `yarn install` and `yarn test`.
 
 ## License
 [Mozilla Public License Version 2.0](https://github.com/taskcluster/pulse-publisher/blob/master/LICENSE)
