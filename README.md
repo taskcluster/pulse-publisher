@@ -95,6 +95,16 @@ await publisher.testExchange({someIdentifier: '...', routes: [], ...});
 // Docs can also be generated with exchange.reference(), see source code docs for details.
 ```
 
+### Test Support
+
+For testing, it is useful to be able to verify that messages were sent without
+requiring a real AMQP server.
+
+Pass `credentials: {fake: true}` to `connect` or `setup` to get this behavior.
+No AMQP connection will be made, but each call to a message-publishing method
+will result in a "fakePublish" message emitted from the publisher with content
+`{exchange, routingKey, payload, CCs}`.
+
 ## Testing
 You'll need to fill a file called `user-config.yml` with valid keys. There is a `user-config-exaemple.yml` you can copy over to see which keys are needed. Then it is just a matter of `yarn install` and `yarn test`.
 

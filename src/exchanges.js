@@ -12,6 +12,48 @@ var amqplib       = require('amqplib');
 var events        = require('events');
 var util          = require('util');
 
+var validateMessage = function(validator, entry, message) {
+  var err = validator(message, entry.schema);
+  if (err) {
+    debug("Failed validate message: %j against schema: %s, error: %j",
+          message, entry.schema, err);
+    throw new Error("Message validation failed. " + err);
+  }
+};
+
+var routingKeyToString = function(entry, routingKey) {
+  if (typeof(routingKey) !== 'string') {
+    routingKey = entry.routingKey.map(function(key) {
+      var word = routingKey[key.name];
+      if (key.constant) {
+        word = key.constant;
+      }
+      if (!key.required && (word === undefined || word === null)) {
+        word = '_';
+      }
+      // Convert numbers to strings
+      if (typeof(word) === 'number') {
+        word = '' + word;
+      }
+      assert(typeof(word) === 'string', "non-string routingKey entry: "
+          + key.name);
+      assert(word.length <= key.maxSize,
+          "routingKey word: '" + word + "' for '" + key.name +
+          "' is longer than maxSize: " + key.maxSize);
+      if (!key.multipleWords) {
+        assert(word.indexOf('.') === -1, "routingKey for " + key.name +
+            " is not declared multipleWords and cannot contain '.' " +
+            "as is the case with '" + word + "'");
+      }
+      return word;
+    }).join('.')
+  }
+
+  // Ensure the routing key is a string
+  assert(typeof(routingKey) === 'string', "routingKey must be a string");
+  return routingKey;
+};
+
 /** Class for publishing to a set of declared exchanges */
 var Publisher = function(conn, channel, entries, exchangePrefix, options) {
   events.EventEmitter.call(this);
@@ -65,47 +107,12 @@ var Publisher = function(conn, channel, entries, exchangePrefix, options) {
 
       // Construct message and routing key from arguments
       var message     = entry.messageBuilder.apply(undefined, args);
-      var routingKey  = entry.routingKeyBuilder.apply(undefined, args);
+      validateMessage(that._options.validator, entry, message);
+
+      var routingKey  = routingKeyToString(entry, entry.routingKeyBuilder.apply(undefined, args));
+
       var CCs         = entry.CCBuilder.apply(undefined, args);
       assert(CCs instanceof Array, "CCBuilder must return an array");
-
-      // Validate against schema
-      var err = that._options.validator(message, entry.schema);
-      if (err) {
-        debug("Failed validate message: %j against schema: %s, error: %j",
-              message, entry.schema, err);
-        throw new Error("Message validation failed. " + err);
-      }
-
-      // Convert routingKey to string if needed
-      if (typeof(routingKey) !== 'string') {
-        routingKey = entry.routingKey.map(function(key) {
-          var word = routingKey[key.name];
-          if (key.constant) {
-            word = key.constant;
-          }
-          if (!key.required && (word === undefined || word === null)) {
-            word = '_';
-          }
-          // Convert numbers to strings
-          if (typeof(word) === 'number') {
-            word = '' + word;
-          }
-          assert(typeof(word) === 'string', "non-string routingKey entry: "
-                                            + key.name);
-          assert(word.length <= key.maxSize,
-                 "routingKey word: '" + word + "' for '" + key.name +
-                 "' is longer than maxSize: " + key.maxSize);
-          if (!key.multipleWords) {
-            assert(word.indexOf('.') === -1, "routingKey for " + key.name +
-                   " is not declared multipleWords and cannot contain '.' " +
-                   "as is the case with '" + word + "'");
-          }
-          return word;
-        }).join('.')
-      }
-      // Ensure the routing key is a string
-      assert(typeof(routingKey) === 'string', "routingKey must be a string");
 
       // Serialize message to buffer
       var payload = new Buffer(JSON.stringify(message), 'utf8');
@@ -158,6 +165,61 @@ Publisher.prototype.close = function() {
   this._closing = true;
   return this._conn.close();
 };
+
+var FakePublisher = function(entries, exchangePrefix, options) {
+  events.EventEmitter.call(this);
+  assert(options.validator, "options.validator must be provided");
+  this._entries = entries;
+  this._options = options;
+  this._closing = false;
+  if (options.drain || options.component) {
+    console.log('taskcluster-lib-stats is now deprecated!\n' +
+                'Use the `monitor` option rather than `drain`.\n' +
+                '`monitor` should be an instance of taskcluster-lib-monitor.\n' +
+                '`component` is no longer needed. Prefix your `monitor` before use.');
+  }
+
+  var monitor = null;
+  if (options.monitor) {
+    monitor = options.monitor;
+  }
+
+  var that = this;
+  entries.forEach(function(entry) {
+    that[entry.name] = function() {
+      // Copy arguments
+      var args = Array.prototype.slice.call(arguments);
+
+      // Construct message and routing key from arguments
+      var message     = entry.messageBuilder.apply(undefined, args);
+      validateMessage(that._options.validator, entry, message);
+
+      var routingKey  = routingKeyToString(entry, entry.routingKeyBuilder.apply(undefined, args));
+
+      var CCs         = entry.CCBuilder.apply(undefined, args);
+      assert(CCs instanceof Array, "CCBuilder must return an array");
+
+      var payload = _.cloneDeep(message);
+
+      // Find exchange name
+      var exchange = exchangePrefix + entry.exchange;
+
+      // Log that we're publishing a message
+      debug("Faking publish of message on exchange: %s", exchange);
+
+      that.emit('fakePublish', {exchange, routingKey, payload, CCs});
+
+      // Return promise
+      return Promise.resolve();
+    };
+  });
+};
+
+// Inherit from events.EventEmitter
+util.inherits(FakePublisher, events.EventEmitter);
+
+/** Close the connection */
+FakePublisher.prototype.close = function() {};
 
 
 /** Create a collection of exchange declarations
@@ -357,6 +419,10 @@ Exchanges.prototype.configure = function(options) {
  * implement a form of reconnection, but for now, just leave the `error` events
  * unhandled and let the process restart on its own.
  *
+ * If credentials are {fake: true}, then no pulse connections will be made. Instead,
+ * the publisher object will emit a 'fakePublish' event with {exchange, routingKey,
+ * payload, CCs}.
+ *
  * Return a promise for an instance of `Publisher`.
  */
 Exchanges.prototype.connect = async function(options) {
@@ -366,7 +432,8 @@ Exchanges.prototype.connect = async function(options) {
 
   // Check we have a connection string
   assert(options.connectionString ||
-         (options.credentials.username && options.credentials.password),
+         (options.credentials.username && options.credentials.password) ||
+         options.credentials.fake,
          "ConnectionString or credentials must be provided");
   assert(options.validator, "A base.validator function must be provided.");
 
@@ -398,6 +465,11 @@ Exchanges.prototype.connect = async function(options) {
 
   // Clone entries for consistency
   var entries = _.cloneDeep(this._entries);
+
+  if (options.credentials.fake) {
+    // TODO: move this to a module that is only require'd here
+    return new FakePublisher(entries, exchangePrefix, options);
+  }
 
   // Create connection
   let conn;
@@ -583,3 +655,4 @@ module.exports = Exchanges;
 
 // Export reference to Publisher
 Exchanges.Publisher = Publisher;
+Exchanges.FakePublisher = FakePublisher;
