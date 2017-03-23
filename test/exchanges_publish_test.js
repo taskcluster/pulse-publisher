@@ -4,14 +4,14 @@ suite("Exchanges", function() {
   var config  = require('typed-env-config');
   var aws     = require('aws-sdk');
 
+  var cfg = config({});
+
+  if (!cfg.aws.secretAccessKey || !cfg.testBucket) {
+    console.log("Skipping 'publish', missing config file: user-config.yml");
+    this.pending = true;
+  }
+
   test("publish", function() {
-    var cfg = config({});
-
-    if (!cfg.aws.secretAccessKey || !cfg.testBucket) {
-      throw new Error("Skipping 'publish', missing config file: " +
-                      "user-config.yml");
-    }
-
     // Create an exchanges
     var exchanges = new subject({
       title:              "Title for my Events",

@@ -16,9 +16,8 @@ suite("Exchanges (Publish on Pulse)", function() {
   var cfg = config({});
 
   if (!cfg.pulse.password) {
-    throw new Error("Skipping 'pulse publisher', missing config file: " +
-                    "user-config.yml");
-    return;
+    console.log("Skipping 'pulse publisher', missing config file: user-config.yml");
+    this.pending = true;
   }
 
   // ConnectionString for use with amqplib only
