@@ -1,11 +1,12 @@
 suite("Exchanges (FakePublisher)", function() {
-  var assert     = require('assert');
-  var subject    = require('../');
-  var config     = require('typed-env-config');
-  var validator  = require('taskcluster-lib-validate');
-  var path       = require('path');
-  var debug      = require('debug')('test');
-  var _          = require('lodash');
+  var assert = require('assert');
+  var subject = require('../');
+  var config = require('typed-env-config');
+  var validator = require('taskcluster-lib-validate');
+  var path = require('path');
+  var debug = require('debug')('test');
+  var _ = require('lodash');
+  var FakePublisher = require('../lib/fake');
 
   var exchanges = null;
   setup(async function() {
@@ -71,7 +72,7 @@ suite("Exchanges (FakePublisher)", function() {
   // Test that we can connect to AMQP server
   test("connect", function() {
     return exchanges.connect().then(function(publisher) {
-      assert(publisher instanceof subject.FakePublisher,
+      assert(publisher instanceof FakePublisher,
              "Should get an instance of exchanges.Publisher");
     });
   });

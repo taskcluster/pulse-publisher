@@ -11,48 +11,7 @@ var aws           = require('aws-sdk');
 var amqplib       = require('amqplib');
 var events        = require('events');
 var util          = require('util');
-
-var validateMessage = function(validator, entry, message) {
-  var err = validator(message, entry.schema);
-  if (err) {
-    debug("Failed validate message: %j against schema: %s, error: %j",
-          message, entry.schema, err);
-    throw new Error("Message validation failed. " + err);
-  }
-};
-
-var routingKeyToString = function(entry, routingKey) {
-  if (typeof(routingKey) !== 'string') {
-    routingKey = entry.routingKey.map(function(key) {
-      var word = routingKey[key.name];
-      if (key.constant) {
-        word = key.constant;
-      }
-      if (!key.required && (word === undefined || word === null)) {
-        word = '_';
-      }
-      // Convert numbers to strings
-      if (typeof(word) === 'number') {
-        word = '' + word;
-      }
-      assert(typeof(word) === 'string', "non-string routingKey entry: "
-          + key.name);
-      assert(word.length <= key.maxSize,
-          "routingKey word: '" + word + "' for '" + key.name +
-          "' is longer than maxSize: " + key.maxSize);
-      if (!key.multipleWords) {
-        assert(word.indexOf('.') === -1, "routingKey for " + key.name +
-            " is not declared multipleWords and cannot contain '.' " +
-            "as is the case with '" + word + "'");
-      }
-      return word;
-    }).join('.')
-  }
-
-  // Ensure the routing key is a string
-  assert(typeof(routingKey) === 'string', "routingKey must be a string");
-  return routingKey;
-};
+var common        = require('./common');
 
 /** Class for publishing to a set of declared exchanges */
 var Publisher = function(conn, channel, entries, exchangePrefix, options) {
@@ -106,12 +65,12 @@ var Publisher = function(conn, channel, entries, exchangePrefix, options) {
       var args = Array.prototype.slice.call(arguments);
 
       // Construct message and routing key from arguments
-      var message     = entry.messageBuilder.apply(undefined, args);
-      validateMessage(that._options.validator, entry, message);
+      var message = entry.messageBuilder.apply(undefined, args);
+      common.validateMessage(that._options.validator, entry, message);
 
-      var routingKey  = routingKeyToString(entry, entry.routingKeyBuilder.apply(undefined, args));
+      var routingKey = common.routingKeyToString(entry, entry.routingKeyBuilder.apply(undefined, args));
 
-      var CCs         = entry.CCBuilder.apply(undefined, args);
+      var CCs = entry.CCBuilder.apply(undefined, args);
       assert(CCs instanceof Array, "CCBuilder must return an array");
 
       // Serialize message to buffer
@@ -166,60 +125,6 @@ Publisher.prototype.close = function() {
   return this._conn.close();
 };
 
-var FakePublisher = function(entries, exchangePrefix, options) {
-  events.EventEmitter.call(this);
-  assert(options.validator, "options.validator must be provided");
-  this._entries = entries;
-  this._options = options;
-  this._closing = false;
-  if (options.drain || options.component) {
-    console.log('taskcluster-lib-stats is now deprecated!\n' +
-                'Use the `monitor` option rather than `drain`.\n' +
-                '`monitor` should be an instance of taskcluster-lib-monitor.\n' +
-                '`component` is no longer needed. Prefix your `monitor` before use.');
-  }
-
-  var monitor = null;
-  if (options.monitor) {
-    monitor = options.monitor;
-  }
-
-  var that = this;
-  entries.forEach(function(entry) {
-    that[entry.name] = function() {
-      // Copy arguments
-      var args = Array.prototype.slice.call(arguments);
-
-      // Construct message and routing key from arguments
-      var message     = entry.messageBuilder.apply(undefined, args);
-      validateMessage(that._options.validator, entry, message);
-
-      var routingKey  = routingKeyToString(entry, entry.routingKeyBuilder.apply(undefined, args));
-
-      var CCs         = entry.CCBuilder.apply(undefined, args);
-      assert(CCs instanceof Array, "CCBuilder must return an array");
-
-      var payload = _.cloneDeep(message);
-
-      // Find exchange name
-      var exchange = exchangePrefix + entry.exchange;
-
-      // Log that we're publishing a message
-      debug("Faking publish of message on exchange: %s", exchange);
-
-      that.emit('fakePublish', {exchange, routingKey, payload, CCs});
-
-      // Return promise
-      return Promise.resolve();
-    };
-  });
-};
-
-// Inherit from events.EventEmitter
-util.inherits(FakePublisher, events.EventEmitter);
-
-/** Close the connection */
-FakePublisher.prototype.close = function() {};
 
 
 /** Create a collection of exchange declarations
@@ -467,7 +372,8 @@ Exchanges.prototype.connect = async function(options) {
   var entries = _.cloneDeep(this._entries);
 
   if (options.credentials.fake) {
-    // TODO: move this to a module that is only require'd here
+    // only load fake on demand
+    var FakePublisher = require('./fake');
     return new FakePublisher(entries, exchangePrefix, options);
   }
 
@@ -655,4 +561,3 @@ module.exports = Exchanges;
 
 // Export reference to Publisher
 Exchanges.Publisher = Publisher;
-Exchanges.FakePublisher = FakePublisher;
