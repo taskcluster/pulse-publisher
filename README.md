@@ -91,9 +91,28 @@ let publisher = await exchanges.connect({
 
 // Send a message to the declared testExchange
 await publisher.testExchange({someIdentifier: '...', routes: [], ...});
-
-// Docs can also be generated with exchange.reference(), see source code docs for details.
 ```
+
+Alternately, if using
+[taskcluster-lib-loader](https://github.com/taskcluster/taskcluster-lib-loader/pull/17/files),
+create a loader component that calls `setup`, which will also publish the exchange reference:
+
+```js
+  publisher: {
+    requires: ['cfg', 'validator', 'monitor'],
+    setup: ({cfg, validator, monitor}) => exchanges.setup({
+      credentials:        cfg.pulse,
+      exchangePrefix:     cfg.app.exchangePrefix,
+      validator:          validator,
+      referencePrefix:    'myservice/v1/exchanges.json',
+      publish:            cfg.app.publishMetaData,
+      aws:                cfg.aws,
+      monitor:            monitor.prefix('publisher'),
+    }),
+  },
+```
+
+Docs can also be generated with exchange.reference(). See the source code docs for details.
 
 ## Testing
 You'll need to fill a file called `user-config.yml` with valid keys. There is a `user-config-exaemple.yml` you can copy over to see which keys are needed. Then it is just a matter of `yarn install` and `yarn test`.
