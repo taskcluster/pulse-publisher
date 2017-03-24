@@ -11,6 +11,7 @@ var aws           = require('aws-sdk');
 var amqplib       = require('amqplib');
 var events        = require('events');
 var util          = require('util');
+var common        = require('./common');
 
 /** Class for publishing to a set of declared exchanges */
 var Publisher = function(conn, channel, entries, exchangePrefix, options) {
@@ -64,48 +65,13 @@ var Publisher = function(conn, channel, entries, exchangePrefix, options) {
       var args = Array.prototype.slice.call(arguments);
 
       // Construct message and routing key from arguments
-      var message     = entry.messageBuilder.apply(undefined, args);
-      var routingKey  = entry.routingKeyBuilder.apply(undefined, args);
-      var CCs         = entry.CCBuilder.apply(undefined, args);
+      var message = entry.messageBuilder.apply(undefined, args);
+      common.validateMessage(that._options.validator, entry, message);
+
+      var routingKey = common.routingKeyToString(entry, entry.routingKeyBuilder.apply(undefined, args));
+
+      var CCs = entry.CCBuilder.apply(undefined, args);
       assert(CCs instanceof Array, "CCBuilder must return an array");
-
-      // Validate against schema
-      var err = that._options.validator(message, entry.schema);
-      if (err) {
-        debug("Failed validate message: %j against schema: %s, error: %j",
-              message, entry.schema, err);
-        throw new Error("Message validation failed. " + err);
-      }
-
-      // Convert routingKey to string if needed
-      if (typeof(routingKey) !== 'string') {
-        routingKey = entry.routingKey.map(function(key) {
-          var word = routingKey[key.name];
-          if (key.constant) {
-            word = key.constant;
-          }
-          if (!key.required && (word === undefined || word === null)) {
-            word = '_';
-          }
-          // Convert numbers to strings
-          if (typeof(word) === 'number') {
-            word = '' + word;
-          }
-          assert(typeof(word) === 'string', "non-string routingKey entry: "
-                                            + key.name);
-          assert(word.length <= key.maxSize,
-                 "routingKey word: '" + word + "' for '" + key.name +
-                 "' is longer than maxSize: " + key.maxSize);
-          if (!key.multipleWords) {
-            assert(word.indexOf('.') === -1, "routingKey for " + key.name +
-                   " is not declared multipleWords and cannot contain '.' " +
-                   "as is the case with '" + word + "'");
-          }
-          return word;
-        }).join('.')
-      }
-      // Ensure the routing key is a string
-      assert(typeof(routingKey) === 'string', "routingKey must be a string");
 
       // Serialize message to buffer
       var payload = new Buffer(JSON.stringify(message), 'utf8');
@@ -158,6 +124,7 @@ Publisher.prototype.close = function() {
   this._closing = true;
   return this._conn.close();
 };
+
 
 
 /** Create a collection of exchange declarations
@@ -357,6 +324,10 @@ Exchanges.prototype.configure = function(options) {
  * implement a form of reconnection, but for now, just leave the `error` events
  * unhandled and let the process restart on its own.
  *
+ * If credentials are {fake: true}, then no pulse connections will be made. Instead,
+ * the publisher object will emit a 'fakePublish' event with {exchange, routingKey,
+ * payload, CCs}.
+ *
  * Return a promise for an instance of `Publisher`.
  */
 Exchanges.prototype.connect = async function(options) {
@@ -366,7 +337,8 @@ Exchanges.prototype.connect = async function(options) {
 
   // Check we have a connection string
   assert(options.connectionString ||
-         (options.credentials.username && options.credentials.password),
+         (options.credentials.username && options.credentials.password) ||
+         options.credentials.fake,
          "ConnectionString or credentials must be provided");
   assert(options.validator, "A base.validator function must be provided.");
 
@@ -398,6 +370,12 @@ Exchanges.prototype.connect = async function(options) {
 
   // Clone entries for consistency
   var entries = _.cloneDeep(this._entries);
+
+  if (options.credentials.fake) {
+    // only load fake on demand
+    var FakePublisher = require('./fake');
+    return new FakePublisher(entries, exchangePrefix, options);
+  }
 
   // Create connection
   let conn;
