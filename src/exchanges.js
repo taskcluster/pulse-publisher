@@ -13,6 +13,18 @@ var events        = require('events');
 var util          = require('util');
 var common        = require('./common');
 
+// Hack to get promises that resolve after 12s without creating a setTimeout
+// for each, instead we create a new promise every 2s and reuse that.
+let _lastTime = 0;
+let _sleeping = null;
+let sleep12Seconds = () => {
+  let time = Date.now();
+  if (time - _lastTime > 2000) {
+    _sleeping = new Promise(accept => setTimeout(accept, 12 * 1000));
+  }
+  return _sleeping;
+};
+
 /** Class for publishing to a set of declared exchanges */
 var Publisher = function(entries, exchangePrefix, options) {
   events.EventEmitter.call(this);
@@ -67,6 +79,16 @@ var Publisher = function(entries, exchangePrefix, options) {
             start = process.hrtime();
           }
 
+          // Set a timeout
+          let done = false;
+          sleep12Seconds().then(() => {
+            if (!done) {
+              let err = new Error('publish message timed out after 12s');
+              this._handleError(err);
+              reject(err);
+            }
+          });
+
           // Publish message
           channel.publish(exchange, routingKey, payload, {
             persistent:         true,
@@ -74,6 +96,7 @@ var Publisher = function(entries, exchangePrefix, options) {
             contentEncoding:    'utf-8',
             CC:                 CCs
           }, (err, val) => {
+            done = true;
             if (monitor) {
               var d = process.hrtime(start);
               monitor.measure(exchange, d[0] * 1000 + (d[1] / 1000000));
