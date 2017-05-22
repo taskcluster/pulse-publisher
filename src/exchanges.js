@@ -14,14 +14,18 @@ var util          = require('util');
 var common        = require('./common');
 
 /** Class for publishing to a set of declared exchanges */
-var Publisher = function(conn, channel, entries, exchangePrefix, options) {
+var Publisher = function(entries, exchangePrefix, options) {
   events.EventEmitter.call(this);
   assert(options.validator, "options.validator must be provided");
-  this._conn = conn;
-  this._channel = channel;
+  this._conn = null;
+  this._channel = null;
+  this._connecting = null;
   this._entries = entries;
+  this._exchangePrefix = exchangePrefix;
   this._options = options;
   this._closing = false;
+  this._errCount = 0;
+  this._lastErr = Date.now();
   if (options.drain || options.component) {
     console.log('taskcluster-lib-stats is now deprecated!\n' +
                 'Use the `monitor` option rather than `drain`.\n' +
@@ -34,39 +38,11 @@ var Publisher = function(conn, channel, entries, exchangePrefix, options) {
     monitor = options.monitor;
   }
 
-  this._channel.on('error', (err) => {
-    debug("Channel error in Publisher: ", err.stack);
-    this.emit('error', err);
-  });
-  this._conn.on('error', (err) => {
-    debug("Connection error in Publisher: ", err.stack);
-    this.emit('error', err);
-  });
-  // Handle graceful server initiated shutdown as an error
-  this._channel.on('close', () => {
-    if (this._closing) {
-      return;
-    }
-    debug('Channel closed unexpectedly');
-    this.emit('error', new Error('channel closed unexpectedly'));
-  });
-  this._conn.on('close', () => {
-    if (this._closing) {
-      return;
-    }
-    debug('Connection closed unexpectedly');
-    this.emit('error', new Error('connection closed unexpectedly'));
-  });
-
-  var that = this;
-  entries.forEach(function(entry) {
-    that[entry.name] = function() {
-      // Copy arguments
-      var args = Array.prototype.slice.call(arguments);
-
+  entries.forEach((entry) => {
+    this[entry.name] = (...args) => {
       // Construct message and routing key from arguments
       var message = entry.messageBuilder.apply(undefined, args);
-      common.validateMessage(that._options.validator, entry, message);
+      common.validateMessage(this._options.validator, entry, message);
 
       var routingKey = common.routingKeyToString(entry, entry.routingKeyBuilder.apply(undefined, args));
 
@@ -83,33 +59,38 @@ var Publisher = function(conn, channel, entries, exchangePrefix, options) {
       debug("Publishing message on exchange: %s", exchange);
 
       // Return promise
-      return new Promise(function(accept, reject) {
-        // Start timer
-        var start = null;
-        if (monitor) {
-          start = process.hrtime();
-        }
-
-        // Publish message
-        that._channel.publish(exchange, routingKey, payload, {
-          persistent:         true,
-          contentType:        'application/json',
-          contentEncoding:    'utf-8',
-          CC:                 CCs
-        }, function(err, val) {
+      return this._connect().then(channel => {
+        return new Promise((accept, reject) => {
+          // Start timer
+          var start = null;
           if (monitor) {
-            var d = process.hrtime(start);
-            monitor.measure(exchange, d[0] * 1000 + (d[1] / 1000000));
-            monitor.count(exchange);
+            start = process.hrtime();
           }
 
-          // Handle errors
-          if (err) {
-            debug("Failed to publish message: %j and routingKey: %s, " +
-                  "with error: %s, %j", message, routingKey, err, err);
-            return reject(err);
-          }
-          accept(val);
+          // Publish message
+          channel.publish(exchange, routingKey, payload, {
+            persistent:         true,
+            contentType:        'application/json',
+            contentEncoding:    'utf-8',
+            CC:                 CCs
+          }, (err, val) => {
+            if (monitor) {
+              var d = process.hrtime(start);
+              monitor.measure(exchange, d[0] * 1000 + (d[1] / 1000000));
+              monitor.count(exchange);
+            }
+
+            // Handle errors
+            if (err) {
+              debug("Failed to publish message: %j and routingKey: %s, " +
+              "with error: %s, %j", message, routingKey, err, err);
+              if (monitor) {
+                monitor.reportError(err);
+              }
+              return reject(err);
+            }
+            accept(val);
+          });
         });
       });
     };
@@ -118,6 +99,100 @@ var Publisher = function(conn, channel, entries, exchangePrefix, options) {
 
 // Inherit from events.EventEmitter
 util.inherits(Publisher, events.EventEmitter);
+
+Publisher.prototype._handleError = function(err) {
+  // Reset error count, if last error is more than 15 minutes ago
+  if (Date.now() - this._lastErr > 15 * 60 * 1000) {
+    this._lastErr = Date.now();
+    this._errCount = 0;
+  }
+  this._lastErr = Date.now();
+  // emit error and abort, if we've retried more than 5 times
+  if (this._errCount++ > 5) {
+    this.emit('error', err);
+    return;
+  }
+
+  // report warning
+  if (this._options.monitor) {
+    this._options.monitor.reportError(err, 'warning');
+  }
+
+  // Reconnect
+  this._connecting = null;
+  return this._connect();
+};
+
+Publisher.prototype._connect = async function() {
+  if (this._connecting) {
+    return this._connecting;
+  }
+  return this._connecting = (async () => {
+    // Create connection
+    let retry = 0;
+    while (true) {
+      // Try to connect a few times, as DNS randomization is used to ensure we try
+      // different nodes
+      try {
+        this._conn = await amqplib.connect(this._options.connectionString, {
+          // Disable TCP Nagle, test don't show any difference in performance, but
+          // it probably can't hurt to disable Nagle, this is a low bandwidth
+          // application, so it makes a lot of sense to disable Nagle.
+          noDelay: true,
+          timeout: 30 * 1000,
+        });
+      } catch (err) {
+        if (retry++ < 12) {
+          continue; // try again
+        }
+        throw err;
+      }
+      break;
+    }
+
+    // Create confirm publish channel
+    this._channel = await this._conn.createConfirmChannel();
+
+    // Create exchanges as declared
+    await Promise.all(this._entries.map(entry => {
+      var name = this._exchangePrefix + entry.exchange;
+      return this._channel.assertExchange(name, 'topic', {
+        durable:      this._options.durableExchanges,
+        internal:     false,
+        autoDelete:   false
+      });
+    }));
+
+    this._channel.on('error', (err) => {
+      debug("Channel error in Publisher: ", err.stack);
+      this._handleError(err);
+    });
+    this._conn.on('error', (err) => {
+      debug("Connection error in Publisher: ", err.stack);
+      this._handleError(err);
+    });
+    // Handle graceful server initiated shutdown as an error
+    this._channel.on('close', () => {
+      if (this._closing) {
+        return;
+      }
+      debug('Channel closed unexpectedly');
+      this._handleError(new Error('channel closed unexpectedly'));
+    });
+    this._conn.on('close', () => {
+      if (this._closing) {
+        return;
+      }
+      debug('Connection closed unexpectedly');
+      this._handleError(new Error('connection closed unexpectedly'));
+    });
+
+    return this._channel;
+  })().catch(err => {
+    // Try again, if limit isn't hit
+    return this._handleError(err);
+  });
+};
 
 /** Close the connection */
 Publisher.prototype.close = function() {
@@ -377,44 +452,10 @@ Exchanges.prototype.connect = async function(options) {
     return new FakePublisher(entries, exchangePrefix, options);
   }
 
-  // Create connection
-  let conn;
-  let retry = 0;
-  while (true) {
-    // Try to connect a few times, as DNS randomization is used to ensure we try
-    // different nodes
-    try {
-      conn = await amqplib.connect(options.connectionString, {
-        // Disable TCP Nagle, test don't show any difference in performance, but
-        // it probably can't hurt to disable Nagle, this is a low bandwidth
-        // application, so it makes a lot of sense to disable Nagle.
-        noDelay: true,
-        timeout: 30 * 1000,
-      });
-    } catch (err) {
-      if (retry++ < 12) {
-        continue; // try again
-      }
-      throw err;
-    }
-    break;
-  }
-
-  // Create confirm publish channel
-  var channel = await conn.createConfirmChannel();
-
-  // Create exchanges as declared
-  await Promise.all(entries.map(function(entry) {
-    var name = exchangePrefix + entry.exchange;
-    return channel.assertExchange(name, 'topic', {
-      durable:      options.durableExchanges,
-      internal:     false,
-      autoDelete:   false
-    });
-  }));
-
   // return publisher
-  return new Publisher(conn, channel, entries, exchangePrefix, options);
+  let publisher = new Publisher(entries, exchangePrefix, options);
+  await publisher._connect();
+  return publisher;
 };
 
 /**
