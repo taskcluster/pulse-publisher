@@ -35,7 +35,6 @@ var Publisher = function(entries, exchangePrefix, options) {
   this._entries = entries;
   this._exchangePrefix = exchangePrefix;
   this._options = options;
-  this._closing = false;
   this._errCount = 0;
   this._lastErr = Date.now();
   if (options.drain || options.component) {
@@ -141,6 +140,12 @@ Publisher.prototype._handleError = function(err) {
     this._options.monitor.reportError(err, 'warning');
   }
 
+  // Close existing connection
+  if (this._conn) {
+    this._conn.___closing = true;
+    this._conn.close();
+  }
+
   // Reconnect
   this._connecting = null;
   return this._connect();
@@ -195,15 +200,17 @@ Publisher.prototype._connect = async function() {
       this._handleError(err);
     });
     // Handle graceful server initiated shutdown as an error
+    let conn = this._conn
+    conn.___closing = false;
     this._channel.on('close', () => {
-      if (this._closing) {
+      if (conn.___closing) {
         return;
       }
       debug('Channel closed unexpectedly');
       this._handleError(new Error('channel closed unexpectedly'));
     });
     this._conn.on('close', () => {
-      if (this._closing) {
+      if (conn.___closing) {
         return;
       }
       debug('Connection closed unexpectedly');
@@ -218,9 +225,15 @@ Publisher.prototype._connect = async function() {
 };
 
 /** Close the connection */
-Publisher.prototype.close = function() {
-  this._closing = true;
-  return this._conn.close();
+Publisher.prototype.close = async function() {
+  if (this._connecting) {
+    await this._connecting;
+  }
+  if (this._conn) {
+    this._connecting = null;
+    this._conn.___closing = true;
+    return this._conn.close();
+  }
 };
 
 
