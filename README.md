@@ -9,7 +9,7 @@ A collection of utilities for interacting with Mozilla's [Pulse](https://pulsegu
 This is tested on and should run on any of node `{0.12, 4, 6, 7}`.
 
 ## Usage
-The source-code contain additional comments for each method.
+The source-code contains additional comments for each method.
 
 ```js
 // Exchanges are typically declared in a file like exchanges.js
@@ -47,7 +47,7 @@ exchanges.declare({
       required: true,
     }, {
       name: 'someId', // See routingKeyBuilder
-      summary: 'Breif docs',
+      summary: 'Brief docs',
       required: true || false, // If false, the default value is '_'
       maxSize: 22,    // Max size is validated when sending
       multipleWords: true || false, // If true, the value can contain dots '.'
