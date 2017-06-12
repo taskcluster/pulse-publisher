@@ -95,6 +95,8 @@ var Publisher = function(entries, exchangePrefix, options) {
             contentEncoding:    'utf-8',
             CC:                 CCs
           }, (err, val) => {
+            // NOTE: many channel errors will not invoke this callback at all,
+            // hence the 12-second timeout
             done = true;
             if (monitor) {
               var d = process.hrtime(start);
