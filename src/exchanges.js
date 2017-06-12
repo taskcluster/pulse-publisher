@@ -13,6 +13,13 @@ var events        = require('events');
 var util          = require('util');
 var common        = require('./common');
 
+// wait 30 seconds before closing a channel, to allow pending operations to flush
+var CLOSE_DELAY = 30 * 1000;
+
+// unconditionally reconnect to pulse on this interval; this ensures the
+// reconnecting logic gets exercised
+var RECONNECT_INTERVAL = 6 * 3600 * 1000;
+
 // Hack to get promises that resolve after 12s without creating a setTimeout
 // for each, instead we create a new promise every 2s and reuse that.
 let _lastTime = 0;
@@ -219,11 +226,34 @@ Publisher.prototype._connect = async function() {
       this._handleError(new Error('connection closed unexpectedly'));
     });
 
+    // set up to reconnect soon..
+    setTimeout(() => this._reconnect(), RECONNECT_INTERVAL);
+
     return this._channel;
   })().catch(err => {
     // Try again, if limit isn't hit
     return this._handleError(err);
   });
+};
+
+Publisher.prototype._reconnect = async function() {
+  this._connecting = null;
+
+  // close old connection after a delay, to allow any pending operations to
+  // complete
+  if (this._conn) {
+    let oldConn = this._conn;
+    this._conn = null;
+
+    setTimeout(() => {
+      oldConn.___closing = true;
+      oldConn.close();
+    }, CLOSE_DELAY);
+  }
+
+  // start connecting; errors here will be handled via _handleError, so
+  // the resulting Promise can be ignored
+  this._connect();
 };
 
 /** Close the connection */
