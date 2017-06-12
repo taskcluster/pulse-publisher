@@ -71,7 +71,7 @@ suite("Exchanges (FakePublisher)", function() {
 
   // Test that we can connect to AMQP server
   test("connect", function() {
-    return exchanges.connect().then(function(publisher) {
+    return exchanges.connect({namespace: 'fake'}).then(function(publisher) {
       assert(publisher instanceof FakePublisher,
              "Should get an instance of exchanges.Publisher");
     });
@@ -80,7 +80,7 @@ suite("Exchanges (FakePublisher)", function() {
   // Test that we can publish messages
   test("publish message", function() {
     var published = []
-    return exchanges.connect().then(function(publisher) {
+    return exchanges.connect({namespace: 'fake'}).then(function(publisher) {
       publisher.on('fakePublish', function(info) { published.push(info); });
       return publisher.testExchange({someString: "My message"}, {
         testId:           "myid",
@@ -89,7 +89,7 @@ suite("Exchanges (FakePublisher)", function() {
       });
     }).then(function() {
       assert(_.isEqual(published, [{
-        exchange: 'test-exchange',
+        exchange: 'exchange/fake/test-exchange',
         routingKey: 'myid.some.string.with.dots._._.-constant-',
         payload: { someString: 'My message' },
         CCs: [] }]));

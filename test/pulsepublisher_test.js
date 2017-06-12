@@ -1,4 +1,4 @@
-suite("Exchanges (Publish on Pulse)", function() {
+suite("Publish to Pulse", function() {
   var assert     = require('assert');
   var subject    = require('../');
   var config     = require('typed-env-config');
@@ -16,7 +16,7 @@ suite("Exchanges (Publish on Pulse)", function() {
   var cfg = config({});
 
   if (!cfg.pulse.password) {
-    console.log("Skipping 'pulse publisher', missing config file: user-config.yml");
+    console.log("Skipping tests due to missing cfg.pulse");
     this.pending = true;
   }
 
@@ -94,15 +94,12 @@ suite("Exchanges (Publish on Pulse)", function() {
     });
 
     // Set options on exchanges
-    exchanges.configure({
-      validator:              validate,
-      credentials:            cfg.pulse
-    });
+    exchanges.configure({validator: validate});
   });
 
   // Test that we can connect to AMQP server
   test("connect", function() {
-    return exchanges.connect().then(function(publisher) {
+    return exchanges.connect({credentials: cfg.pulse}).then(function(publisher) {
       assert(publisher instanceof subject.Publisher,
              "Should get an instance of exchanges.Publisher");
     });
@@ -110,7 +107,7 @@ suite("Exchanges (Publish on Pulse)", function() {
 
   // Test that we can publish messages
   test("publish message", function() {
-    return exchanges.connect().then(function(publisher) {
+    return exchanges.connect({credentials: cfg.pulse}).then(function(publisher) {
       return publisher.testExchange({someString: "My message"}, {
         testId:           "myid",
         taskRoutingKey:   "some.string.with.dots",
@@ -119,12 +116,11 @@ suite("Exchanges (Publish on Pulse)", function() {
     });
   });
 
-
   /*
   // Test that we can publish messages fast
   test("publish message 400", function() {
     var promises = [];
-    return exchanges.connect().then(function(publisher) {
+    return exchanges.connect({credentials: cfg.pulse}).then(function(publisher) {
       for (var i = 0; i < 400; i++) {
         promises.push(new Promise(function(accept) {
           setTimeout(accept, Math.floor(i / 4));
@@ -150,7 +146,7 @@ suite("Exchanges (Publish on Pulse)", function() {
   // Test that we can publish messages fast
   test("publish message 400", function() {
     var promises = [];
-    return exchanges.connect().then(function(publisher) {
+    return exchanges.connect({credentials: cfg.pulse}).then(function(publisher) {
       for (var i = 0; i < 400; i++) {
         promises.push(publisher.testExchange({someString: "My message" + i}, {
           testId:           "myid",
@@ -165,7 +161,7 @@ suite("Exchanges (Publish on Pulse)", function() {
   /*
   // Test that we can publish messages fast (for TCP Nagle disable test)
   test("publish message", function() {
-    return exchanges.connect().then(function(publisher) {
+    return exchanges.connect({credentials: cfg.pulse}).then(function(publisher) {
       var i = 0;
       var loop = function() {
         i += 1;
@@ -187,7 +183,7 @@ suite("Exchanges (Publish on Pulse)", function() {
 
   // Test that we can publish messages
   test("publish message w. number in routing key", function() {
-    return exchanges.connect().then(function(publisher) {
+    return exchanges.connect({credentials: cfg.pulse}).then(function(publisher) {
       return publisher.testExchange({someString: "My message"}, {
         testId:           "myid",
         taskRoutingKey:   "some.string.with.dots",
@@ -199,7 +195,7 @@ suite("Exchanges (Publish on Pulse)", function() {
 
   // Test publication fails on schema violation
   test("publish error w. schema violation", function() {
-    return exchanges.connect().then(function(publisher) {
+    return exchanges.connect({credentials: cfg.pulse}).then(function(publisher) {
       return publisher.testExchange({
         someString:   "My message",
         "volation":   true
@@ -219,7 +215,7 @@ suite("Exchanges (Publish on Pulse)", function() {
 
   // Test publication fails on required key missing
   test("publish error w. required key missing", function() {
-    return exchanges.connect().then(function(publisher) {
+    return exchanges.connect({credentials: cfg.pulse}).then(function(publisher) {
       return publisher.testExchange({
         someString:   "My message",
       }, {
@@ -236,7 +232,7 @@ suite("Exchanges (Publish on Pulse)", function() {
 
   // Test publication fails on size violation
   test("publish error w. size violation", function() {
-    return exchanges.connect().then(function(publisher) {
+    return exchanges.connect({credentials: cfg.pulse}).then(function(publisher) {
       return publisher.testExchange({
         someString:   "My message",
       }, {
@@ -254,7 +250,7 @@ suite("Exchanges (Publish on Pulse)", function() {
 
   // Test publication fails on multiple words
   test("publish error w. multiple words", function() {
-    return exchanges.connect().then(function(publisher) {
+    return exchanges.connect({credentials: cfg.pulse}).then(function(publisher) {
       return publisher.testExchange({
         someString:   "My message",
       }, {
@@ -297,7 +293,7 @@ suite("Exchanges (Publish on Pulse)", function() {
         messages.push(msg);
       });
     }).then(function() {
-      return exchanges.connect().then(function(publisher) {
+      return exchanges.connect({credentials: cfg.pulse}).then(function(publisher) {
         return publisher.testExchange({someString: "My message"}, {
           testId:           "myid",
           taskRoutingKey:   "some.string.with.dots",
@@ -341,7 +337,7 @@ suite("Exchanges (Publish on Pulse)", function() {
         messages.push(msg);
       });
     }).then(function() {
-      return exchanges.connect().then(function(publisher) {
+      return exchanges.connect({credentials: cfg.pulse}).then(function(publisher) {
         return publisher.testExchange({someString: "My message"}, {
           testId:           "myid",
           taskRoutingKey:   "some.string.with.dots",
@@ -357,7 +353,7 @@ suite("Exchanges (Publish on Pulse)", function() {
 
   // Test that we can publish messages with large CC
   test("publish message (huge CC)", function() {
-    return exchanges.connect().then(function(publisher) {
+    return exchanges.connect({credentials: cfg.pulse}).then(function(publisher) {
       return publisher.testExchange({someString: "My message"}, {
         testId:           "myid",
         taskRoutingKey:   "some.string.with.dots",
@@ -385,6 +381,7 @@ suite("Exchanges (Publish on Pulse)", function() {
     assert(_.keys(monitor.counts).length === 0, "We shouldn't have any points");
     return exchanges.connect({
       monitor,
+      credentials: cfg.pulse,
     }).then(function(publisher) {
       return publisher.testExchange({someString: "My message"}, {
         testId:           "myid",
@@ -393,6 +390,48 @@ suite("Exchanges (Publish on Pulse)", function() {
       });
     }).then(function() {
       assert(_.keys(monitor.counts).length === 1, "We should have one point");
+    });
+  });
+
+  suite('with taskcluster credentials', function() {
+    if (!cfg.taskcluster) {
+      console.log("Skipping tests due to missing cfg.taskcluster");
+      this.pending = true;
+    }
+
+    test("publish message (and receive)", async function() {
+      var queue = 'queue/' + cfg.pulse.username + '/test/' + slugid.v4(),
+          namespace = 'taskcluster-tests-' + slugid.nice();
+      var messages = [];
+
+      let publisher = await exchanges.connect({
+        credentials: cfg.taskcluster,
+        namespace,
+        expires: '1 hour',
+      });
+
+      let conn = await amqplib.connect(connectionString);
+      let channel = await conn.createConfirmChannel();
+      await channel.assertQueue(queue, {
+        exclusive:  true,
+        durable:    false,
+        autoDelete: true,
+      });
+      var testExchange = 'exchange/' + namespace + '/test-exchange';
+      await channel.bindQueue(queue, testExchange, 'myid.#');
+      await channel.consume(queue, function(msg) {
+        msg.content = JSON.parse(msg.content.toString());
+        //console.log(JSON.stringify(msg, null, 2));
+        messages.push(msg);
+      });
+
+      await publisher.testExchange({someString: "My message"}, {
+        testId:           "myid",
+        taskRoutingKey:   "some.string.with.dots",
+        state:            undefined // Optional
+      });
+      await new Promise(function(accept) {setTimeout(accept, 400);});
+      assert(messages.length == 1, "Didn't get exactly one message");
     });
   });
 });
