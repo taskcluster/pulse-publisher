@@ -26,7 +26,7 @@
     "lodash": "^4.0.0",
     "promise": "^7.0.0",
     "slugid": "^1.1.0",
-    "taskcluster-client": "^2.4.2"
+    "taskcluster-client": "^2.4.3"
   },
   "devDependencies": {
     "babel-compile": "^2.0.0",

@@ -23,9 +23,9 @@ var RECONNECT_INTERVAL = "6 hours";
 
 // Hack to get promises that resolve after 12s without creating a setTimeout
 // for each, instead we create a new promise every 2s and reuse that.
-let _lastTime = 0;
-let _sleeping = null;
-let sleep12Seconds = () => {
+var _lastTime = 0;
+var _sleeping = null;
+var sleep12Seconds = () => {
   let time = Date.now();
   if (time - _lastTime > 2000) {
     _sleeping = new Promise(accept => setTimeout(accept, 12 * 1000));
