@@ -83,9 +83,11 @@ exchanges.declare({
 
 // Some where in your app, instantiate a publisher
 let publisher = await exchanges.connect({
-  credentials: {username: '...', password: '...'},
-  exchangePrefix: 'v1/', // Prefix for all exchanges (in addition to exchanges/<username>/)
-  validator: await require('taskcluster-lib-validate')(), // instance of taskcluster-lib-validate
+  credentials: {clientId: '...', accessToken: '...'}, // client that can use tc-pulse
+  namespace: '...', // namespace for the pulse exchanges (e.g., `taskcluster-glurble`)
+  expires: '1 day', // lifetime of the namespace
+  exchangePrefix: 'v1/', // Prefix for all exchanges (in addition to exchanges/<namespace>/)
+  validator: await require('taskcluster-lib-validate'), // instance of taskcluster-lib-validate
   monitor: undefined, // optional instance of taskcluster-lib-monitor
 });
 
@@ -101,7 +103,9 @@ create a loader component that calls `setup`, which will also publish the exchan
   publisher: {
     requires: ['cfg', 'validator', 'monitor'],
     setup: ({cfg, validator, monitor}) => exchanges.setup({
-      credentials:        cfg.pulse,
+      credentials:        cfg.app.taskcluster,
+      namespace:          cfg.pulse.namespace,
+      expires:            cfg.pulse.expires,
       exchangePrefix:     cfg.app.exchangePrefix,
       validator:          validator,
       referencePrefix:    'myservice/v1/exchanges.json',

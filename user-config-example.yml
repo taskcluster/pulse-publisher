@@ -3,6 +3,10 @@ defaults:
   aws:
     accessKeyId:      "..."
     secretAccessKey:  "..."
+  # this client should have pulse:namespace:taskcluster-tests-*
+  taskcluster:
+    clientId: "..."
+    accessToken: "..."
   pulse:
     username: "..."
     password: "..."

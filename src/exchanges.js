@@ -12,12 +12,20 @@ var amqplib       = require('amqplib');
 var events        = require('events');
 var util          = require('util');
 var common        = require('./common');
+var taskcluster   = require('taskcluster-client');
+
+// wait 30 seconds before closing a channel, to allow pending operations to flush
+var CLOSE_DELAY = 30 * 1000;
+
+// unconditionally reconnect to pulse on this interval; this ensures the
+// reconnecting logic gets exercised
+var RECONNECT_INTERVAL = "6 hours";
 
 // Hack to get promises that resolve after 12s without creating a setTimeout
 // for each, instead we create a new promise every 2s and reuse that.
-let _lastTime = 0;
-let _sleeping = null;
-let sleep12Seconds = () => {
+var _lastTime = 0;
+var _sleeping = null;
+var sleep12Seconds = () => {
   let time = Date.now();
   if (time - _lastTime > 2000) {
     _sleeping = new Promise(accept => setTimeout(accept, 12 * 1000));
@@ -26,10 +34,11 @@ let sleep12Seconds = () => {
 };
 
 /** Class for publishing to a set of declared exchanges */
-var Publisher = function(entries, exchangePrefix, options) {
+var Publisher = function(entries, exchangePrefix, connectionFunc, options) {
   events.EventEmitter.call(this);
   assert(options.validator, "options.validator must be provided");
   this._conn = null;
+  this._connectionFunc = connectionFunc;
   this._channel = null;
   this._connecting = null;
   this._entries = entries;
@@ -158,13 +167,15 @@ Publisher.prototype._connect = async function() {
     return this._connecting;
   }
   return this._connecting = (async () => {
+    let {connectionString, reconnectAt} = await this._connectionFunc();
+
     // Create connection
     let retry = 0;
     while (true) {
       // Try to connect a few times, as DNS randomization is used to ensure we try
       // different nodes
       try {
-        this._conn = await amqplib.connect(this._options.connectionString, {
+        this._conn = await amqplib.connect(connectionString, {
           // Disable TCP Nagle, test don't show any difference in performance, but
           // it probably can't hurt to disable Nagle, this is a low bandwidth
           // application, so it makes a lot of sense to disable Nagle.
@@ -219,11 +230,37 @@ Publisher.prototype._connect = async function() {
       this._handleError(new Error('connection closed unexpectedly'));
     });
 
+    // set up to reconnect soon..
+    debug("Will reconnect at " + reconnectAt.toJSON());
+    let reconnectDelay = Math.max(0, reconnectAt - new Date());
+    setTimeout(() => this._reconnect(), reconnectDelay);
+
     return this._channel;
   })().catch(err => {
     // Try again, if limit isn't hit
     return this._handleError(err);
   });
+};
+
+Publisher.prototype._reconnect = async function() {
+  debug("reconnecting to Pulse");
+  this._connecting = null;
+
+  // close old connection after a delay, to allow any pending operations to
+  // complete
+  if (this._conn) {
+    let oldConn = this._conn;
+    this._conn = null;
+
+    setTimeout(() => {
+      oldConn.___closing = true;
+      oldConn.close();
+    }, CLOSE_DELAY);
+  }
+
+  // start connecting; errors here will be handled via _handleError, so
+  // the resulting Promise can be ignored
+  this._connect();
 };
 
 /** Close the connection */
@@ -417,16 +454,31 @@ Exchanges.prototype.configure = function(options) {
  *
  * Options:
  * {
- *   credentials: {
- *     username:        '...',   // Pulse username
- *     password:        '...',   // Pulse password
- *     hostname:        '...'    // Hostname, defaults to pulse.mozilla.org
- *   },
- *   connectionString:  '...',   // AMQP connection string, if not credentials
- *   exchangePrefix:    '...',   // Exchange prefix
+ *   credentials: .. (see below)
+ *   namespace: '...',           // pulse namespace (usually taskcluster-foo)
+ *   expires: '1 year',           // time after which the namespace expires
+ *   contact: 'foo@bar',         // contact email for the pulse namespace
+ *   exchangePrefix:    '...',   // Exchange prefix ('v1/')
  *   validator:                  // Instance of base.validator
  *   monitor:           await require('taskcluster-lib-monitor')({...}),
  * }
+ *
+ * Given a set of permanent Pulse credentials, pass credentials:
+ * {
+ *   username:        '...',   // Pulse username
+ *   password:        '...',   // Pulse password
+ *   hostname:        '...'    // Hostname, defaults to pulse.mozilla.org
+ * },
+ * In this case, the namespace will default to the username.
+ *
+ * To use Taskcluster-Pulse, pass credentials:
+ * {
+ *   clientId: '...', // client with scope `pulse:claim-namespace:<namespace>`
+ *   accessToken: '...',
+ *   certificate: '...', // if using temporary credentials
+ * }
+ *
+ * For a fake publisher, pass credentials: {fake: true}.
  *
  * This method will connect to AMQP server and return a instance of Publisher.
  * The publisher will have a method for each declared exchange, the method
@@ -448,50 +500,65 @@ Exchanges.prototype.connect = async function(options) {
     credentials:        {}
   });
 
-  // Check we have a connection string
-  assert(options.connectionString ||
-         (options.credentials.username && options.credentials.password) ||
-         options.credentials.fake,
-         "ConnectionString or credentials must be provided");
   assert(options.validator, "A base.validator function must be provided.");
+  assert(options.credentials, "Some kind of credentials are required.");
+  let credentials = options.credentials;
+  assert(options.namespace || credentials.username, "Must provide a namespace.");
 
   // Find exchange prefix, may be further prefixed if pulse credentials
   // are given
-  var exchangePrefix = options.exchangePrefix;
-
-  // If we have pulse credentials, construct connectionString
-  if (options.credentials &&
-      options.credentials.username &&
-      options.credentials.password) {
-    options.connectionString = [
-      'amqps://',         // Ensure that we're using SSL
-      options.credentials.username,
-      ':',
-      options.credentials.password,
-      '@',
-      options.credentials.hostname || 'pulse.mozilla.org',
-      ':',
-      5671                // Port for SSL
-    ].join('');
-    // Also construct exchange prefix
-    exchangePrefix = [
-      'exchange',
-      options.credentials.username,
-      options.exchangePrefix
-    ].join('/');
-  }
+  var exchangePrefix = [
+    'exchange',
+    options.namespace || credentials.username,
+    options.exchangePrefix,
+  ].join('/');
 
   // Clone entries for consistency
   var entries = _.cloneDeep(this._entries);
 
-  if (options.credentials.fake) {
+  // make a function to get a connectionString, based on options.
+  let connectionFunc;
+  if (credentials.username &&
+      credentials.password) {
+    let connectionString = [
+      'amqps://',         // Ensure that we're using SSL
+      credentials.username,
+      ':',
+      credentials.password,
+      '@',
+      credentials.hostname || 'pulse.mozilla.org',
+      ':',
+      5671                // Port for SSL
+    ].join('');
+    connectionFunc = async () => ({
+      connectionString,
+      reconnectAt: taskcluster.fromNow(RECONNECT_INTERVAL),
+    });
+  } else if (credentials.clientId && credentials.accessToken) {
+    assert(options.namespace, "Must specify a namespace");
+    assert(options.expires, "Must specify a namespace expiration");
+
+    let tcPulse = new taskcluster.Pulse({credentials});
+    connectionFunc = async () => {
+      let claim = await tcPulse.claimNamespace(options.namespace, {
+        expires: taskcluster.fromNow(options.expires),
+        contact: options.contact,
+      });
+      return {
+        connectionString: claim.connectionString,
+        reconnectAt: new Date(claim.reclaimAt),
+      };
+    };
+  } else if (credentials.fake) {
     // only load fake on demand
     var FakePublisher = require('./fake');
     return new FakePublisher(entries, exchangePrefix, options);
+  } else {
+    throw new Error("invalid credentials");
   }
 
   // return publisher
-  let publisher = new Publisher(entries, exchangePrefix, options);
+  let publisher = new Publisher(entries, exchangePrefix, connectionFunc, options);
   await publisher._connect();
   return publisher;
 };
