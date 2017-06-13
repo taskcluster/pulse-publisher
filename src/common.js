@@ -27,7 +27,7 @@ exports.routingKeyToString = function(entry, routingKey) {
         word = '' + word;
       }
       assert(typeof(word) === 'string', "non-string routingKey entry: "
-          + key.name);
+          + key.name + ": " + word);
       assert(word.length <= key.maxSize,
           "routingKey word: '" + word + "' for '" + key.name +
           "' is longer than maxSize: " + key.maxSize);
