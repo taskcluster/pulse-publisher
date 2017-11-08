@@ -1447,9 +1447,9 @@ taskcluster-client@^1.0.1:
   optionalDependencies:
     sockjs-client "^1.0.3"
 
-taskcluster-client@^2.4.2:
-  version "2.4.2"
-  resolved "https://registry.yarnpkg.com/taskcluster-client/-/taskcluster-client-2.4.2.tgz#f167d1bb71e2c2e002adbea98139475a2f10ab87"
+taskcluster-client@^2.4.3:
+  version "2.5.4"
+  resolved "https://registry.yarnpkg.com/taskcluster-client/-/taskcluster-client-2.5.4.tgz#6a1e51e995e4e034a5eaf3f1d91badbb4f2ca1e1"
   dependencies:
     amqplib "^0.5.1"
     debug "^2.1.3"
