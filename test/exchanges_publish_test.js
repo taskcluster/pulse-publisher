@@ -1,4 +1,4 @@
-suite("Exchanges", function() {
+suite('Exchanges', function() {
   var assert  = require('assert');
   var subject = require('../');
   var config  = require('typed-env-config');
@@ -7,42 +7,42 @@ suite("Exchanges", function() {
   var cfg = config({});
 
   if (!cfg.aws.secretAccessKey || !cfg.testBucket) {
-    console.log("Skipping 'publish', missing config file: user-config.yml");
+    console.log('Skipping \'publish\', missing config file: user-config.yml');
     this.pending = true;
   }
 
-  test("publish", function() {
+  test('publish', function() {
     // Create an exchanges
     var exchanges = new subject({
-      title:              "Title for my Events",
-      description:        "Test exchanges used for testing things only"
+      title:              'Title for my Events',
+      description:        'Test exchanges used for testing things only',
     });
     // Check that we can declare an exchange
     exchanges.declare({
       exchange:           'test-exchange',
       name:               'testExchange',
-      title:              "Test Exchange",
-      description:        "Place we post message for **testing**.",
+      title:              'Test Exchange',
+      description:        'Place we post message for **testing**.',
       routingKey: [
         {
           name:           'testId',
-          summary:        "Identifier that we use for testing",
+          summary:        'Identifier that we use for testing',
           multipleWords:  false,
           required:       true,
-          maxSize:        22
+          maxSize:        22,
         }, {
           name:           'taskRoutingKey',
-          summary:        "Test specific routing-key: `test.key`",
+          summary:        'Test specific routing-key: `test.key`',
           multipleWords:  true,
           required:       true,
-          maxSize:        128
+          maxSize:        128,
         }, {
           name:           'state',
-          summary:        "State of something",
+          summary:        'State of something',
           multipleWords:  false,
           required:       false,
-          maxSize:        16
-        }
+          maxSize:        16,
+        },
       ],
       schema: 'http://schemas.taskcluster.net/base/tests/exchanges-test.json',
       messageBuilder:     function(test) { return test; },
@@ -50,30 +50,30 @@ suite("Exchanges", function() {
         return {
           testId:           test.id,
           taskRoutingKey:   test.key,
-          state:            state
-        }
+          state:            state,
+        };
       },
-      CCBuilder:          function() { return []; }
+      CCBuilder:          function() { return []; },
     });
 
     // Publish
     return exchanges.publish({
       referencePrefix:      'base/test/exchanges.json',
       referenceBucket:      cfg.testBucket,
-      aws:                  cfg.aws
+      aws:                  cfg.aws,
     }).then(function() {
       // Get the file... we don't bother checking the contents this is good
       // enough
       var s3 = new aws.S3(cfg.aws);
       return s3.getObject({
         Bucket:     cfg.testBucket,
-        Key:        'base/test/exchanges.json'
+        Key:        'base/test/exchanges.json',
       }).promise();
     }).then(function(res) {
       var reference = JSON.parse(res.Body);
-      assert(reference.entries, "Missing entries");
-      assert(reference.entries.length > 0, "Has no entries");
-      assert(reference.title, "Missing title");
+      assert(reference.entries, 'Missing entries');
+      assert(reference.entries.length > 0, 'Has no entries');
+      assert(reference.title, 'Missing title');
     });
   });
 });

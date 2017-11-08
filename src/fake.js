@@ -8,7 +8,7 @@ var common        = require('./common');
 
 var FakePublisher = function(entries, exchangePrefix, options) {
   events.EventEmitter.call(this);
-  assert(options.validator, "options.validator must be provided");
+  assert(options.validator, 'options.validator must be provided');
   this._entries = entries;
   this._options = options;
   this._closing = false;
@@ -37,7 +37,7 @@ var FakePublisher = function(entries, exchangePrefix, options) {
       var routingKey = common.routingKeyToString(entry, entry.routingKeyBuilder.apply(undefined, args));
 
       var CCs = entry.CCBuilder.apply(undefined, args);
-      assert(CCs instanceof Array, "CCBuilder must return an array");
+      assert(CCs instanceof Array, 'CCBuilder must return an array');
 
       var payload = _.cloneDeep(message);
 
@@ -45,7 +45,7 @@ var FakePublisher = function(entries, exchangePrefix, options) {
       var exchange = exchangePrefix + entry.exchange;
 
       // Log that we're publishing a message
-      debug("Faking publish of message on exchange: %s", exchange);
+      debug('Faking publish of message on exchange: %s', exchange);
 
       that.emit('fakePublish', {exchange, routingKey, payload, CCs});
 
