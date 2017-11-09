@@ -34,6 +34,7 @@ suite('Publish to Pulse', function() {
 
   var monitor = null;
   var exchanges = null;
+  var publisher = null;
   setup(async function() {
     exchanges = new subject({
       title:              'Title for my Events',
@@ -95,107 +96,42 @@ suite('Publish to Pulse', function() {
 
     // Set options on exchanges
     exchanges.configure({validator: validate});
+
+    publisher = await exchanges.connect({credentials: cfg.pulse});
+  });
+
+  teardown(function() {
+    publisher.close();
   });
 
   // Test that we can connect to AMQP server
   test('connect', function() {
-    return exchanges.connect({credentials: cfg.pulse}).then(function(publisher) {
-      assert(publisher instanceof subject.Publisher,
-        'Should get an instance of exchanges.Publisher');
-    });
+    assert(publisher instanceof subject.Publisher,
+      'Should get an instance of exchanges.Publisher');
   });
 
   // Test that we can publish messages
   test('publish message', function() {
-    return exchanges.connect({credentials: cfg.pulse}).then(function(publisher) {
-      return publisher.testExchange({someString: 'My message'}, {
-        testId:           'myid',
-        taskRoutingKey:   'some.string.with.dots',
-        state:            undefined, // Optional
-      });
+    return publisher.testExchange({someString: 'My message'}, {
+      testId:           'myid',
+      taskRoutingKey:   'some.string.with.dots',
+      state:            undefined, // Optional
     });
   });
 
-  /*
-  // Test that we can publish messages fast
-  test("publish message 400", function() {
-    var promises = [];
-    return exchanges.connect({credentials: cfg.pulse}).then(function(publisher) {
-      for (var i = 0; i < 400; i++) {
-        promises.push(new Promise(function(accept) {
-          setTimeout(accept, Math.floor(i / 4));
-        }).then(function() {
-          return publisher.testExchange({someString: "My message" + i}, {
-            testId:           "myid",
-            taskRoutingKey:   "some.string.with.dots",
-            state:            undefined // Optional
-          }).then(function() {
-            publisher.testExchange({someString: "My message" + i}, {
-              testId:           "myid",
-              taskRoutingKey:   "some.string.with.dots",
-              state:            undefined // Optional
-            });
-          });
-        }));
-      }
-      return Promise.all(promises);
-    });
-  }); return; // */
-
-  /*
-  // Test that we can publish messages fast
-  test("publish message 400", function() {
-    var promises = [];
-    return exchanges.connect({credentials: cfg.pulse}).then(function(publisher) {
-      for (var i = 0; i < 400; i++) {
-        promises.push(publisher.testExchange({someString: "My message" + i}, {
-          testId:           "myid",
-          taskRoutingKey:   "some.string.with.dots",
-          state:            undefined // Optional
-        }));
-      }
-      return Promise.all(promises);
-    });
-  }); return; // */
-
-  /*
-  // Test that we can publish messages fast (for TCP Nagle disable test)
-  test("publish message", function() {
-    return exchanges.connect({credentials: cfg.pulse}).then(function(publisher) {
-      var i = 0;
-      var loop = function() {
-        i += 1;
-        if (i > 400) {
-          return;
-        }
-        console.log(i);
-        return publisher.testExchange({someString: "My message"}, {
-          testId:           "myid",
-          taskRoutingKey:   "some.string.with.dots",
-          state:            undefined // Optional
-        }).then(function() {
-          return loop();
-        });
-      };
-      return loop();
-    });
-  }); return; // */
-
   // Test that we can publish messages
   test('publish message w. number in routing key', function() {
-    return exchanges.connect({credentials: cfg.pulse}).then(function(publisher) {
-      return publisher.testExchange({someString: 'My message'}, {
-        testId:           'myid',
-        taskRoutingKey:   'some.string.with.dots',
-        state:            undefined, // Optional
-        index:            15,
-      });
+    return publisher.testExchange({someString: 'My message'}, {
+      testId:           'myid',
+      taskRoutingKey:   'some.string.with.dots',
+      state:            undefined, // Optional
+      index:            15,
     });
   });
 
   // Test publication fails on schema violation
   test('publish error w. schema violation', function() {
-    return exchanges.connect({credentials: cfg.pulse}).then(function(publisher) {
+    try {
       return publisher.testExchange({
         someString:   'My message',
         volation:   true,
@@ -204,34 +140,34 @@ suite('Publish to Pulse', function() {
         taskRoutingKey:   'some.string.with.dots',
         state:            undefined, // Optional
       });
-    }).then(function() {
-      assert(false, 'Expected an error');
-    }, function(err) {
+    } catch (err) {
       // Expected an error
       debug('Got expected Error: %s, %j', err, err);
-    });
+      return;
+    }
+    assert(false, 'Expected an error');
   });
 
   // Test publication fails on required key missing
   test('publish error w. required key missing', function() {
-    return exchanges.connect({credentials: cfg.pulse}).then(function(publisher) {
+    try {
       return publisher.testExchange({
         someString:   'My message',
       }, {
         taskRoutingKey:   'some.string.with.dots',
         state:            'here',
       });
-    }).then(function() {
-      assert(false, 'Expected an error');
-    }, function(err) {
+    } catch (err) {
       // Expected an error
       debug('Got expected Error: %s, %j', err, err);
-    });
+      return;
+    }
+    assert(false, 'Expected an error');
   });
 
   // Test publication fails on size violation
   test('publish error w. size violation', function() {
-    return exchanges.connect({credentials: cfg.pulse}).then(function(publisher) {
+    try {
       return publisher.testExchange({
         someString:   'My message',
       }, {
@@ -239,17 +175,17 @@ suite('Publish to Pulse', function() {
         taskRoutingKey:   'some.string.with.dots',
         state:            undefined, // Optional
       });
-    }).then(function() {
-      assert(false, 'Expected an error');
-    }, function(err) {
+    } catch (err) {
       // Expected an error
       debug('Got expected Error: %s, %j', err, err);
-    });
+      return;
+    }
+    assert(false, 'Expected an error');
   });
 
   // Test publication fails on multiple words
   test('publish error w. multiple words', function() {
-    return exchanges.connect({credentials: cfg.pulse}).then(function(publisher) {
+    try {
       return publisher.testExchange({
         someString:   'My message',
       }, {
@@ -257,12 +193,12 @@ suite('Publish to Pulse', function() {
         taskRoutingKey:   'some.string.with.dots',
         state:            undefined, // Optional
       });
-    }).then(function() {
-      assert(false, 'Expected an error');
-    }, function(err) {
+    } catch (err) {
       // Expected an error
       debug('Got expected Error: %s, %j', err, err);
-    });
+      return;
+    }
+    assert(false, 'Expected an error');
   });
 
   // Test that we can publish messages and get them again
@@ -288,22 +224,21 @@ suite('Publish to Pulse', function() {
     }).then(function() {
       return channel.consume(queue, function(msg) {
         msg.content = JSON.parse(msg.content.toString());
-        //console.log(JSON.stringify(msg, null, 2));
         messages.push(msg);
       });
     }).then(function() {
-      return exchanges.connect({credentials: cfg.pulse}).then(function(publisher) {
-        return publisher.testExchange({someString: 'My message'}, {
-          testId:           'myid',
-          taskRoutingKey:   'some.string.with.dots',
-          state:            undefined, // Optional
-        });
+      return publisher.testExchange({someString: 'My message'}, {
+        testId:           'myid',
+        taskRoutingKey:   'some.string.with.dots',
+        state:            undefined, // Optional
       });
     }).then(function() {
       return new Promise(function(accept) {setTimeout(accept, 400);});
     }).then(function() {
       // Others could be publishing to this exchange, so we check msgs > 0
       assert(messages.length > 0, 'Didn\'t get exactly any messages');
+    }).finally(function() {
+      return conn.close();
     });
   });
 
@@ -336,54 +271,54 @@ suite('Publish to Pulse', function() {
         messages.push(msg);
       });
     }).then(function() {
-      return exchanges.connect({credentials: cfg.pulse}).then(function(publisher) {
-        return publisher.testExchange({someString: 'My message'}, {
-          testId:           'myid',
-          taskRoutingKey:   'some.string.with.dots',
-          state:            undefined, // Optional
-        }, ['something.cced']);
-      });
+      return publisher.testExchange({someString: 'My message'}, {
+        testId:           'myid',
+        taskRoutingKey:   'some.string.with.dots',
+        state:            undefined, // Optional
+      }, ['something.cced']);
     }).then(function() {
       return new Promise(function(accept) {setTimeout(accept, 300);});
     }).then(function() {
       assert(messages.length === 1, 'Didn\'t get exactly one message');
+    }).finally(function() {
+      return conn.close();
     });
   });
 
   // Test that we can publish messages with large CC
   test('publish message (huge CC)', function() {
-    return exchanges.connect({credentials: cfg.pulse}).then(function(publisher) {
-      return publisher.testExchange({someString: 'My message'}, {
-        testId:           'myid',
-        taskRoutingKey:   'some.string.with.dots',
-        state:            undefined, // Optional
-      }, [
-        /* eslint-disable max-len */
-        'route.index.gecko.v2.mozilla-aurora.revision.4b053b4106a9b99268312c5fcf8ac1048cc80430.firefox-l10n.linux64-opt.son',
-        'route.index.gecko.v2.mozilla-aurora.pushdate.2017.01.23.20170123201356.firefox-l10n.linux64-opt.son',
-        'route.index.gecko.v2.mozilla-aurora.latest.firefox-l10n.linux64-opt.son',
-        'route.index.gecko.v2.mozilla-aurora.revision.4b053b4106a9b99268312c5fcf8ac1048cc80430.firefox-l10n.linux64-opt.sq',
-        'route.index.gecko.v2.mozilla-aurora.pushdate.2017.01.23.20170123201356.firefox-l10n.linux64-opt.sq',
-        'route.index.gecko.v2.mozilla-aurora.latest.firefox-l10n.linux64-opt.sq',
-        'route.index.gecko.v2.mozilla-aurora.revision.4b053b4106a9b99268312c5fcf8ac1048cc80430.firefox-l10n.linux64-opt.sr',
-        'route.index.gecko.v2.mozilla-aurora.pushdate.2017.01.23.20170123201356.firefox-l10n.linux64-opt.sr',
-        'route.index.gecko.v2.mozilla-aurora.latest.firefox-l10n.linux64-opt.sr',
-        'route.index.gecko.v2.mozilla-aurora.revision.4b053b4106a9b99268312c5fcf8ac1048cc80430.firefox-l10n.linux64-opt.sv-SE',
-        'route.index.gecko.v2.mozilla-aurora.pushdate.2017.01.23.20170123201356.firefox-l10n.linux64-opt.sv-SE',
-        'route.index.gecko.v2.mozilla-aurora.latest.firefox-l10n.linux64-opt.sv-SE',
-        'route.index.gecko.v2.mozilla-aurora.revision.4b053b4106a9b99268312c5fcf8ac1048cc80430.firefox-l10n.linux64-opt.ta',
-        /* eslint-enable max-len */
-      ]);
-    });
+    return publisher.testExchange({someString: 'My message'}, {
+      testId:           'myid',
+      taskRoutingKey:   'some.string.with.dots',
+      state:            undefined, // Optional
+    }, [
+      /* eslint-disable max-len */
+      'route.index.gecko.v2.mozilla-aurora.revision.4b053b4106a9b99268312c5fcf8ac1048cc80430.firefox-l10n.linux64-opt.son',
+      'route.index.gecko.v2.mozilla-aurora.pushdate.2017.01.23.20170123201356.firefox-l10n.linux64-opt.son',
+      'route.index.gecko.v2.mozilla-aurora.latest.firefox-l10n.linux64-opt.son',
+      'route.index.gecko.v2.mozilla-aurora.revision.4b053b4106a9b99268312c5fcf8ac1048cc80430.firefox-l10n.linux64-opt.sq',
+      'route.index.gecko.v2.mozilla-aurora.pushdate.2017.01.23.20170123201356.firefox-l10n.linux64-opt.sq',
+      'route.index.gecko.v2.mozilla-aurora.latest.firefox-l10n.linux64-opt.sq',
+      'route.index.gecko.v2.mozilla-aurora.revision.4b053b4106a9b99268312c5fcf8ac1048cc80430.firefox-l10n.linux64-opt.sr',
+      'route.index.gecko.v2.mozilla-aurora.pushdate.2017.01.23.20170123201356.firefox-l10n.linux64-opt.sr',
+      'route.index.gecko.v2.mozilla-aurora.latest.firefox-l10n.linux64-opt.sr',
+      'route.index.gecko.v2.mozilla-aurora.revision.4b053b4106a9b99268312c5fcf8ac1048cc80430.firefox-l10n.linux64-opt.sv-SE',
+      'route.index.gecko.v2.mozilla-aurora.pushdate.2017.01.23.20170123201356.firefox-l10n.linux64-opt.sv-SE',
+      'route.index.gecko.v2.mozilla-aurora.latest.firefox-l10n.linux64-opt.sv-SE',
+      'route.index.gecko.v2.mozilla-aurora.revision.4b053b4106a9b99268312c5fcf8ac1048cc80430.firefox-l10n.linux64-opt.ta',
+      /* eslint-enable max-len */
+    ]);
   });
 
   // Test that we record statistics
   test('publish message (record statistics)', function() {
+    var _publisher;
     assert(_.keys(monitor.counts).length === 0, 'We shouldn\'t have any points');
     return exchanges.connect({
       monitor,
       credentials: cfg.pulse,
     }).then(function(publisher) {
+      _publisher = publisher;
       return publisher.testExchange({someString: 'My message'}, {
         testId:           'myid',
         taskRoutingKey:   'some.string.with.dots',
@@ -391,6 +326,7 @@ suite('Publish to Pulse', function() {
       });
     }).then(function() {
       assert(_.keys(monitor.counts).length === 1, 'We should have one point');
+      return _publisher.close();
     });
   });
 
@@ -433,6 +369,7 @@ suite('Publish to Pulse', function() {
       });
       await new Promise(function(accept) {setTimeout(accept, 400);});
       assert(messages.length == 1, 'Didn\'t get exactly one message');
+      await publisher.close();
     });
   });
 });

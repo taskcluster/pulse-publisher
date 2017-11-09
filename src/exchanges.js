@@ -24,10 +24,13 @@ var RECONNECT_INTERVAL = '6 hours';
 // for each, instead we create a new promise every 2s and reuse that.
 var _lastTime = 0;
 var _sleeping = null;
+var _sleepingTimeout = null;
 var sleep12Seconds = () => {
   let time = Date.now();
   if (time - _lastTime > 2000) {
-    _sleeping = new Promise(accept => setTimeout(accept, 12 * 1000));
+    _sleeping = new Promise(accept => {
+      _sleepingTimeout = setTimeout(accept, 12 * 1000);
+    });
   }
   return _sleeping;
 };
@@ -37,6 +40,7 @@ var Publisher = function(entries, exchangePrefix, connectionFunc, options) {
   events.EventEmitter.call(this);
   assert(options.validator, 'options.validator must be provided');
   this._conn = null;
+  this.__reconnectTimer = null;
   this._connectionFunc = connectionFunc;
   this._channel = null;
   this._connecting = null;
@@ -232,7 +236,10 @@ Publisher.prototype._connect = async function() {
     // set up to reconnect soon..
     debug('Will reconnect at ' + reconnectAt.toJSON());
     let reconnectDelay = Math.max(0, reconnectAt - new Date());
-    setTimeout(() => this._reconnect(), reconnectDelay);
+    if (this.__reconnectTimer) {
+      clearTimeout(this.__reconnectTimer);
+    }
+    this.__reconnectTimer = setTimeout(() => this._reconnect(), reconnectDelay);
 
     return this._channel;
   })().catch(err => {
@@ -266,6 +273,12 @@ Publisher.prototype._reconnect = async function() {
 Publisher.prototype.close = async function() {
   if (this._connecting) {
     await this._connecting;
+  }
+  if (this.__reconnectTimer) {
+    clearTimeout(this.__reconnectTimer);
+  }
+  if (_sleepingTimeout) {
+    clearTimeout(_sleepingTimeout);
   }
   if (this._conn) {
     this._connecting = null;

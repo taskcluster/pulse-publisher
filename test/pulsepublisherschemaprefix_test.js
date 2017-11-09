@@ -33,6 +33,7 @@ suite('Exchanges (Publish on Pulse w. schemaPrefix)', function() {
 
   var monitor = null;
   var exchanges = null;
+  var publisher = null;
   setup(async function() {
     exchanges = new subject({
       title:              'Title for my Events',
@@ -98,24 +99,26 @@ suite('Exchanges (Publish on Pulse w. schemaPrefix)', function() {
       validator:              validate,
       credentials:            cfg.pulse,
     });
+
+    publisher = await exchanges.connect();
+  });
+
+  teardown(function() {
+    return publisher.close();
   });
 
   // Test that we can connect to AMQP server
   test('connect', function() {
-    return exchanges.connect().then(function(publisher) {
-      assert(publisher instanceof subject.Publisher,
-        'Should get an instance of exchanges.Publisher');
-    });
+    assert(publisher instanceof subject.Publisher,
+      'Should get an instance of exchanges.Publisher');
   });
 
   // Test that we can publish messages
   test('publish message', function() {
-    return exchanges.connect().then(function(publisher) {
-      return publisher.testExchange({someString: 'My message'}, {
-        testId:           'myid',
-        taskRoutingKey:   'some.string.with.dots',
-        state:            undefined, // Optional
-      });
+    return publisher.testExchange({someString: 'My message'}, {
+      testId:           'myid',
+      taskRoutingKey:   'some.string.with.dots',
+      state:            undefined, // Optional
     });
   });
 });
