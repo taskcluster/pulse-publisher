@@ -11,7 +11,7 @@ addons:
     - g++-4.8
 env:
   global:
-  - DEBUG='* -superagent -express:* -mocha:* -babel'
+  - DEBUG='* -superagent -express:* -mocha:* -babel -eslint*'
   - CXX=g++-4.8
 cache:
   yarn: true
