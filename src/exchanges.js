@@ -20,21 +20,6 @@ var CLOSE_DELAY = 30 * 1000;
 // reconnecting logic gets exercised
 var RECONNECT_INTERVAL = '6 hours';
 
-// Hack to get promises that resolve after 12s without creating a setTimeout
-// for each, instead we create a new promise every 2s and reuse that.
-var _lastTime = 0;
-var _sleeping = null;
-var _sleepingTimeout = null;
-var sleep12Seconds = () => {
-  let time = Date.now();
-  if (time - _lastTime > 2000) {
-    _sleeping = new Promise(accept => {
-      _sleepingTimeout = setTimeout(accept, 12 * 1000);
-    });
-  }
-  return _sleeping;
-};
-
 /** Class for publishing to a set of declared exchanges */
 var Publisher = function(entries, exchangePrefix, connectionFunc, options) {
   events.EventEmitter.call(this);
@@ -49,6 +34,9 @@ var Publisher = function(entries, exchangePrefix, connectionFunc, options) {
   this._options = options;
   this._errCount = 0;
   this._lastErr = Date.now();
+  this._lastTime = 0;
+  this._sleeping = null;
+  this._sleepingTimeout = null;
   if (options.drain || options.component) {
     console.log('taskcluster-lib-stats is now deprecated!\n' +
                 'Use the `monitor` option rather than `drain`.\n' +
@@ -92,7 +80,7 @@ var Publisher = function(entries, exchangePrefix, connectionFunc, options) {
 
           // Set a timeout
           let done = false;
-          sleep12Seconds().then(() => {
+          this._sleep12Seconds().then(() => {
             if (!done) {
               let err = new Error('publish message timed out after 12s');
               this._handleError(err);
@@ -135,6 +123,18 @@ var Publisher = function(entries, exchangePrefix, connectionFunc, options) {
 
 // Inherit from events.EventEmitter
 util.inherits(Publisher, events.EventEmitter);
+
+// Hack to get promises that resolve after 12s without creating a setTimeout
+// for each, instead we create a new promise every 2s and reuse that.
+Publisher.prototype._sleep12Seconds = function() {
+  let time = Date.now();
+  if (time - this._lastTime > 2000) {
+    this._sleeping = new Promise(accept => {
+      this._sleepingTimeout = setTimeout(accept, 12 * 1000);
+    });
+  }
+  return this._sleeping;
+};
 
 Publisher.prototype._handleError = function(err) {
   // Reset error count, if last error is more than 15 minutes ago
@@ -276,9 +276,11 @@ Publisher.prototype.close = async function() {
   }
   if (this.__reconnectTimer) {
     clearTimeout(this.__reconnectTimer);
+    this.__reconnectTimer = null;
   }
-  if (_sleepingTimeout) {
-    clearTimeout(_sleepingTimeout);
+  if (this._sleepingTimeout) {
+    clearTimeout(this._sleepingTimeout);
+    this._sleepingTimeout = null;
   }
   if (this._conn) {
     this._connecting = null;
