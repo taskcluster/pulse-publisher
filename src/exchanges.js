@@ -1,4 +1,3 @@
-"use strict";
 
 var assert        = require('assert');
 var debug         = require('debug')('base:exchanges');
@@ -19,25 +18,14 @@ var CLOSE_DELAY = 30 * 1000;
 
 // unconditionally reconnect to pulse on this interval; this ensures the
 // reconnecting logic gets exercised
-var RECONNECT_INTERVAL = "6 hours";
-
-// Hack to get promises that resolve after 12s without creating a setTimeout
-// for each, instead we create a new promise every 2s and reuse that.
-var _lastTime = 0;
-var _sleeping = null;
-var sleep12Seconds = () => {
-  let time = Date.now();
-  if (time - _lastTime > 2000) {
-    _sleeping = new Promise(accept => setTimeout(accept, 12 * 1000));
-  }
-  return _sleeping;
-};
+var RECONNECT_INTERVAL = '6 hours';
 
 /** Class for publishing to a set of declared exchanges */
 var Publisher = function(entries, exchangePrefix, connectionFunc, options) {
   events.EventEmitter.call(this);
-  assert(options.validator, "options.validator must be provided");
+  assert(options.validator, 'options.validator must be provided');
   this._conn = null;
+  this.__reconnectTimer = null;
   this._connectionFunc = connectionFunc;
   this._channel = null;
   this._connecting = null;
@@ -46,6 +34,9 @@ var Publisher = function(entries, exchangePrefix, connectionFunc, options) {
   this._options = options;
   this._errCount = 0;
   this._lastErr = Date.now();
+  this._lastTime = 0;
+  this._sleeping = null;
+  this._sleepingTimeout = null;
   if (options.drain || options.component) {
     console.log('taskcluster-lib-stats is now deprecated!\n' +
                 'Use the `monitor` option rather than `drain`.\n' +
@@ -67,7 +58,7 @@ var Publisher = function(entries, exchangePrefix, connectionFunc, options) {
       var routingKey = common.routingKeyToString(entry, entry.routingKeyBuilder.apply(undefined, args));
 
       var CCs = entry.CCBuilder.apply(undefined, args);
-      assert(CCs instanceof Array, "CCBuilder must return an array");
+      assert(CCs instanceof Array, 'CCBuilder must return an array');
 
       // Serialize message to buffer
       var payload = new Buffer(JSON.stringify(message), 'utf8');
@@ -76,7 +67,7 @@ var Publisher = function(entries, exchangePrefix, connectionFunc, options) {
       var exchange = exchangePrefix + entry.exchange;
 
       // Log that we're publishing a message
-      debug("Publishing message on exchange: %s", exchange);
+      debug('Publishing message on exchange: %s', exchange);
 
       // Return promise
       return this._connect().then(channel => {
@@ -89,7 +80,7 @@ var Publisher = function(entries, exchangePrefix, connectionFunc, options) {
 
           // Set a timeout
           let done = false;
-          sleep12Seconds().then(() => {
+          this._sleep12Seconds().then(() => {
             if (!done) {
               let err = new Error('publish message timed out after 12s');
               this._handleError(err);
@@ -102,21 +93,21 @@ var Publisher = function(entries, exchangePrefix, connectionFunc, options) {
             persistent:         true,
             contentType:        'application/json',
             contentEncoding:    'utf-8',
-            CC:                 CCs
+            CC:                 CCs,
           }, (err, val) => {
             // NOTE: many channel errors will not invoke this callback at all,
             // hence the 12-second timeout
             done = true;
             if (monitor) {
               var d = process.hrtime(start);
-              monitor.measure(exchange, d[0] * 1000 + (d[1] / 1000000));
+              monitor.measure(exchange, d[0] * 1000 + d[1] / 1000000);
               monitor.count(exchange);
             }
 
             // Handle errors
             if (err) {
-              debug("Failed to publish message: %j and routingKey: %s, " +
-              "with error: %s, %j", message, routingKey, err, err);
+              debug('Failed to publish message: %j and routingKey: %s, ' +
+              'with error: %s, %j', message, routingKey, err, err);
               if (monitor) {
                 monitor.reportError(err);
               }
@@ -132,6 +123,18 @@ var Publisher = function(entries, exchangePrefix, connectionFunc, options) {
 
 // Inherit from events.EventEmitter
 util.inherits(Publisher, events.EventEmitter);
+
+// Hack to get promises that resolve after 12s without creating a setTimeout
+// for each, instead we create a new promise every 2s and reuse that.
+Publisher.prototype._sleep12Seconds = function() {
+  let time = Date.now();
+  if (time - this._lastTime > 2000) {
+    this._sleeping = new Promise(accept => {
+      this._sleepingTimeout = setTimeout(accept, 12 * 1000);
+    });
+  }
+  return this._sleeping;
+};
 
 Publisher.prototype._handleError = function(err) {
   // Reset error count, if last error is more than 15 minutes ago
@@ -200,20 +203,20 @@ Publisher.prototype._connect = async function() {
       return this._channel.assertExchange(name, 'topic', {
         durable:      this._options.durableExchanges,
         internal:     false,
-        autoDelete:   false
+        autoDelete:   false,
       });
     }));
 
     this._channel.on('error', (err) => {
-      debug("Channel error in Publisher: ", err.stack);
+      debug('Channel error in Publisher: ', err.stack);
       this._handleError(err);
     });
     this._conn.on('error', (err) => {
-      debug("Connection error in Publisher: ", err.stack);
+      debug('Connection error in Publisher: ', err.stack);
       this._handleError(err);
     });
     // Handle graceful server initiated shutdown as an error
-    let conn = this._conn
+    let conn = this._conn;
     conn.___closing = false;
     this._channel.on('close', () => {
       if (conn.___closing) {
@@ -231,9 +234,12 @@ Publisher.prototype._connect = async function() {
     });
 
     // set up to reconnect soon..
-    debug("Will reconnect at " + reconnectAt.toJSON());
+    debug('Will reconnect at ' + reconnectAt.toJSON());
     let reconnectDelay = Math.max(0, reconnectAt - new Date());
-    setTimeout(() => this._reconnect(), reconnectDelay);
+    if (this.__reconnectTimer) {
+      clearTimeout(this.__reconnectTimer);
+    }
+    this.__reconnectTimer = setTimeout(() => this._reconnect(), reconnectDelay);
 
     return this._channel;
   })().catch(err => {
@@ -243,7 +249,7 @@ Publisher.prototype._connect = async function() {
 };
 
 Publisher.prototype._reconnect = async function() {
-  debug("reconnecting to Pulse");
+  debug('reconnecting to Pulse');
   this._connecting = null;
 
   // close old connection after a delay, to allow any pending operations to
@@ -268,14 +274,20 @@ Publisher.prototype.close = async function() {
   if (this._connecting) {
     await this._connecting;
   }
+  if (this.__reconnectTimer) {
+    clearTimeout(this.__reconnectTimer);
+    this.__reconnectTimer = null;
+  }
+  if (this._sleepingTimeout) {
+    clearTimeout(this._sleepingTimeout);
+    this._sleepingTimeout = null;
+  }
   if (this._conn) {
     this._connecting = null;
     this._conn.___closing = true;
     return this._conn.close();
   }
 };
-
-
 
 /** Create a collection of exchange declarations
  *
@@ -297,10 +309,10 @@ var Exchanges = function(options) {
   this._options = {
     exchangePrefix:       '',
     durableExchanges:     true,
-    schemaPrefix:         ''
+    schemaPrefix:         '',
   };
-  assert(options.title,       "title must be provided");
-  assert(options.description, "description must be provided");
+  assert(options.title,       'title must be provided');
+  assert(options.description, 'description must be provided');
   this.configure(options);
 };
 
@@ -345,14 +357,14 @@ var Exchanges = function(options) {
  * (It's not recommended to return a string).
  */
 Exchanges.prototype.declare = function(options) {
-  assert(options, "options must be given to declare");
+  assert(options, 'options must be given to declare');
 
   // Check that we have properties that must be strings
   [
-    'exchange', 'name', 'title', 'description', 'schema'
+    'exchange', 'name', 'title', 'description', 'schema',
   ].forEach(function(key) {
-    assert(typeof(options[key]) === 'string', "Option: '" + key + "' must be " +
-           "a string");
+    assert(typeof options[key] === 'string', 'Option: \'' + key + '\' must be ' +
+           'a string');
   });
 
   // Prefix schemas if a prefix is declared
@@ -362,23 +374,23 @@ Exchanges.prototype.declare = function(options) {
 
   // Validate routingKey declaration
   assert(options.routingKey instanceof Array,
-         "routingKey must be an array");
+    'routingKey must be an array');
 
   var keyNames = [];
   var sizeLeft = 255;
   var firstMultiWordKey = null;
   options.routingKey.forEach(function(key) {
     // Check that the key name is unique
-    assert(keyNames.indexOf(key.name) === -1, "Can't have two routing key " +
-           "entries named: '" + key.name + "'");
+    assert(keyNames.indexOf(key.name) === -1, 'Can\'t have two routing key ' +
+           'entries named: \'' + key.name + '\'');
     keyNames.push(key.name);
     // Check that we have a summary
-    assert(typeof(key.summary) === 'string', "summary of routingKey entry " +
-           "must be provided.");
+    assert(typeof key.summary === 'string', 'summary of routingKey entry ' +
+           'must be provided.');
 
     // Ensure that have a boolean value for simplicity
-    key.multipleWords = (key.multipleWords ? true : false);
-    key.required      = (key.required ? true : false);
+    key.multipleWords = key.multipleWords ? true : false;
+    key.required      = key.required ? true : false;
 
     // Check that we only have one multipleWords key in the routing key. If we
     // have more than one then we can't really parse the routing key
@@ -389,16 +401,16 @@ Exchanges.prototype.declare = function(options) {
     // design solution.
     if (key.multipleWords) {
       assert(firstMultiWordKey === null,
-             "Can't have two multipleWord entries in a routing key, " +
-             "here we have both '" + firstMultiWordKey + "' and " +
-             "'" + key.name + "'");
+        'Can\'t have two multipleWord entries in a routing key, ' +
+             'here we have both \'' + firstMultiWordKey + '\' and ' +
+             '\'' + key.name + '\'');
       firstMultiWordKey = key.name;
     }
 
     if (key.constant) {
       // Check that any constant is indeed a string
-      assert(typeof(key.constant) === 'string',
-             "constant must be a string, if provided");
+      assert(typeof key.constant === 'string',
+        'constant must be a string, if provided');
 
       // Set maxSize
       if (!key.maxSize) {
@@ -407,37 +419,37 @@ Exchanges.prototype.declare = function(options) {
     }
 
     // Check that we have a maxSize
-    assert(typeof(key.maxSize) == 'number' && key.maxSize > 0,
-           "routingKey declaration " + key.name + " must have maxSize > 0");
+    assert(typeof key.maxSize == 'number' && key.maxSize > 0,
+      'routingKey declaration ' + key.name + ' must have maxSize > 0');
 
     // Check size left in routingKey space
     if (sizeLeft != 255) {
       sizeLeft -= 1; // Remove on for the joining dot
     }
     sizeLeft -= key.maxSize;
-    assert(sizeLeft >= 0, "Combined routingKey cannot be larger than 255 " +
-           "including joining dots");
+    assert(sizeLeft >= 0, 'Combined routingKey cannot be larger than 255 ' +
+           'including joining dots');
   });
 
   // Validate messageBuilder
   assert(options.messageBuilder instanceof Function,
-         "messageBuilder must be a Function");
+    'messageBuilder must be a Function');
 
   // Validate routingKeyBuilder
   assert(options.routingKeyBuilder instanceof Function,
-         "routingKeyBuilder must be a function");
+    'routingKeyBuilder must be a function');
 
   // Validate CCBuilder
   assert(options.CCBuilder instanceof Function,
-         "CCBuilder must be a function");
+    'CCBuilder must be a function');
 
   // Check that `exchange` and `name` are unique
   this._entries.forEach(function(entry) {
     assert(entry.exchange !== options.exchange,
-           "Cannot have two declarations with exchange: '" +
-           entry.exchange + "'");
+      'Cannot have two declarations with exchange: \'' +
+           entry.exchange + '\'');
     assert(entry.name !== options.name,
-           "Cannot have two declarations with name: '" + entry.name + "'");
+      'Cannot have two declarations with name: \'' + entry.name + '\'');
   });
 
   // Add options to set of options
@@ -497,13 +509,13 @@ Exchanges.prototype.configure = function(options) {
  */
 Exchanges.prototype.connect = async function(options) {
   options = _.defaults({}, options || {}, this._options, {
-    credentials:        {}
+    credentials:        {},
   });
 
-  assert(options.validator, "A base.validator function must be provided.");
-  assert(options.credentials, "Some kind of credentials are required.");
+  assert(options.validator, 'A base.validator function must be provided.');
+  assert(options.credentials, 'Some kind of credentials are required.');
   let credentials = options.credentials;
-  assert(options.namespace || credentials.username, "Must provide a namespace.");
+  assert(options.namespace || credentials.username, 'Must provide a namespace.');
 
   // Find exchange prefix, may be further prefixed if pulse credentials
   // are given
@@ -528,15 +540,15 @@ Exchanges.prototype.connect = async function(options) {
       '@',
       credentials.hostname || 'pulse.mozilla.org',
       ':',
-      5671                // Port for SSL
+      5671,                // Port for SSL
     ].join('');
     connectionFunc = async () => ({
       connectionString,
       reconnectAt: taskcluster.fromNow(RECONNECT_INTERVAL),
     });
   } else if (credentials.clientId && credentials.accessToken) {
-    assert(options.namespace, "Must specify a namespace");
-    assert(options.expires, "Must specify a namespace expiration");
+    assert(options.namespace, 'Must specify a namespace');
+    assert(options.expires, 'Must specify a namespace expiration');
 
     let tcPulse = new taskcluster.Pulse({credentials});
     connectionFunc = async () => {
@@ -554,7 +566,7 @@ Exchanges.prototype.connect = async function(options) {
     var FakePublisher = require('./fake');
     return new FakePublisher(entries, exchangePrefix, options);
   } else {
-    throw new Error("invalid credentials");
+    throw new Error('invalid credentials');
   }
 
   // return publisher
@@ -575,7 +587,7 @@ Exchanges.prototype.connect = async function(options) {
  */
 Exchanges.prototype.reference = function(options) {
   options = _.defaults({}, options || {}, this._options, {
-    credentials:        {}
+    credentials:        {},
   });
 
   // Exchange prefix maybe prefixed additionally, if pulse credentials is given
@@ -587,18 +599,18 @@ Exchanges.prototype.reference = function(options) {
     exchangePrefix = [
       'exchange',
       options.credentials.username,
-      options.exchangePrefix
+      options.exchangePrefix,
     ].join('/');
   }
 
   // Check title and description
-  assert(options.title,       "title must be provided");
-  assert(options.description, "description must be provided");
+  assert(options.title,       'title must be provided');
+  assert(options.description, 'description must be provided');
 
   // Create reference
   var reference = {
     version:            0,
-    '$schema':          'http://schemas.taskcluster.net/base/v1/' +
+    $schema:          'http://schemas.taskcluster.net/base/v1/' +
                         'exchanges-reference.json#',
     title:              options.title,
     description:        options.description,
@@ -612,13 +624,12 @@ Exchanges.prototype.reference = function(options) {
         description:    entry.description,
         routingKey:     entry.routingKey.map(function(key) {
           return _.pick(key, 'name', 'summary', 'constant',
-                             'multipleWords', 'required');
+            'multipleWords', 'required');
         }),
-        schema:         entry.schema
+        schema:         entry.schema,
       };
-    })
+    }),
   };
-
 
   var ajv = Ajv({useDefaults: true, format: 'full', verbose: true, allErrors: true});
   // Load exchanges-reference.json schema from disk
@@ -631,9 +642,9 @@ Exchanges.prototype.reference = function(options) {
                   'exchanges-reference.json#';
   var valid = validate(reference, refSchema);
   if (!valid) {
-    debug("Exchanges.references(): Failed to validate against schema, " +
-          "errors: %j reference: %j", validate.errors, reference);
-    throw new Error("API.references(): Failed to validate against schema");
+    debug('Exchanges.references(): Failed to validate against schema, ' +
+          'errors: %j reference: %j', validate.errors, reference);
+    throw new Error('API.references(): Failed to validate against schema');
   }
 
   // Return reference
@@ -663,11 +674,11 @@ Exchanges.prototype.reference = function(options) {
 Exchanges.prototype.publish = function(options) {
   // Provide default options
   options = _.defaults({}, options || {}, this._options, {
-    referenceBucket:    'references.taskcluster.net'
+    referenceBucket:    'references.taskcluster.net',
   });
   // Check that required options are provided
   ['referencePrefix', 'aws'].forEach(function(key) {
-    assert(options[key], "Option '" + key + "' must be provided");
+    assert(options[key], 'Option \'' + key + '\' must be provided');
   });
   // Create S3 object
   var s3 = new aws.S3(options.aws);
@@ -676,7 +687,7 @@ Exchanges.prototype.publish = function(options) {
     Bucket:           options.referenceBucket,
     Key:              options.referencePrefix,
     Body:             JSON.stringify(this.reference(options), undefined, 2),
-    ContentType:      'application/json'
+    ContentType:      'application/json',
   }).promise();
 };
 
