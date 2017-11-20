@@ -515,13 +515,13 @@ Exchanges.prototype.connect = async function(options) {
   assert(options.validator, 'A base.validator function must be provided.');
   assert(options.credentials, 'Some kind of credentials are required.');
   let credentials = options.credentials;
-  assert(options.namespace || credentials.username, 'Must provide a namespace.');
+  assert(options.namespace || credentials.username || credentials.fake === 'true', 'Must provide a namespace.');
 
   // Find exchange prefix, may be further prefixed if pulse credentials
   // are given
   var exchangePrefix = [
     'exchange',
-    options.namespace || credentials.username,
+    options.namespace || credentials.username || 'fake',
     options.exchangePrefix,
   ].join('/');
 
