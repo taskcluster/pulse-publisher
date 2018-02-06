@@ -106,6 +106,11 @@ var Publisher = function(entries, exchangePrefix, connectionFunc, options) {
 
             // Handle errors
             if (err) {
+              err.methodName = entry.name;
+              err.exchange = exchange;
+              err.routingKey = routingKey;
+              err.payload = payload;
+              err.ccRoutingKeys = CCs;
               debug('Failed to publish message: %j and routingKey: %s, ' +
               'with error: %s, %j', message, routingKey, err, err);
               if (monitor) {
