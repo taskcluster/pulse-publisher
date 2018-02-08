@@ -7,7 +7,7 @@ suite('Exchanges', function() {
   var cfg = config({});
 
   if (!cfg.aws.secretAccessKey || !cfg.testBucket) {
-    console.log('Skipping \'publish\', missing config file: user-config.yml');
+    console.log('Skipping \'publish\', missing S3 configs in: user-config.yml');
     this.pending = true;
   }
 

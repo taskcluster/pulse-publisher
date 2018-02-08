@@ -330,7 +330,9 @@ suite('Publish to Pulse', function() {
     });
   });
 
-  suite('with taskcluster credentials', function() {
+  // skipped because tc-pulse isn't running
+  // https://bugzilla.mozilla.org/show_bug.cgi?id=1436456
+  suite.skip('with taskcluster credentials', function() {
     if (!cfg.taskcluster) {
       console.log('Skipping tests due to missing cfg.taskcluster');
       this.pending = true;
