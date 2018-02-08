@@ -2147,9 +2147,9 @@ taskcluster-lib-monitor@^4.6.3:
     taskcluster-client "^1.0.1"
     usage "^0.7.1"
 
-taskcluster-lib-validate@^3.0.1:
-  version "3.0.1"
-  resolved "https://registry.yarnpkg.com/taskcluster-lib-validate/-/taskcluster-lib-validate-3.0.1.tgz#100280e7137bb065bcb7c27570e23238a7781afd"
+taskcluster-lib-validate@^3.0.3:
+  version "3.0.3"
+  resolved "https://registry.yarnpkg.com/taskcluster-lib-validate/-/taskcluster-lib-validate-3.0.3.tgz#3b09ccda1a205e728009bafb60f2eb0a11e10a85"
   dependencies:
     ajv "^5.3.0"
     app-root-dir "^1.0.2"
