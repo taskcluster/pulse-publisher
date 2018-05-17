@@ -79,19 +79,20 @@ suite('Publish to Pulse', function() {
           constant:       '-constant-',
         },
       ],
-      schema:             'http://localhost:1203/exchange-test-schema.json#',
+      schema:             'http://localhost:1203/schemas/pulse-publisher-tests/exchange-test-schema.json#',
       messageBuilder:     function(msg) { return msg; },
       routingKeyBuilder:  function(msg, rk) { return rk; },
       CCBuilder:          function(msg, rk, cc = []) {return cc;},
     });
 
     var validate = await validator({
+      rootUrl: 'http://localhost:1203/',
+      serviceName: 'pulse-publisher-tests',
       folder:  path.join(__dirname, 'schemas'),
-      baseUrl: 'http://localhost:1203/',
     });
 
     monitor = await monitoring({
-      project: 'pulse-publisher',
+      projectName: 'pulse-publisher',
       credentials: {},
       mock: true,
     });

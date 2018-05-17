@@ -38,7 +38,7 @@ suite('Exchanges (Publish on Pulse w. schemaPrefix)', function() {
     exchanges = new subject({
       title:              'Title for my Events',
       description:        'Test exchanges used for testing things only',
-      schemaPrefix:       'http://localhost:1203/',
+      schemaPrefix:       'http://localhost:1203/schemas/pulse-publisher-tests/',
     });
     // Check that we can declare an exchange
     exchanges.declare({
@@ -84,12 +84,13 @@ suite('Exchanges (Publish on Pulse w. schemaPrefix)', function() {
     });
 
     var validate = await validator({
-      folder:     path.join(__dirname, 'schemas'),
-      baseUrl:    'http://localhost:1203/',
+      rootUrl:     'http://localhost:1203/',
+      serviceName: 'pulse-publisher-tests',
+      folder:      path.join(__dirname, 'schemas'),
     });
 
     monitor = await monitoring({
-      project: 'pulse-publisher',
+      projectName: 'pulse-publisher',
       credentials: {},
       mock: true,
     });
