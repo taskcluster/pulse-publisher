@@ -27,9 +27,11 @@ suite('Publish to Pulse', function() {
     ':',
     cfg.pulse.password,
     '@',
-    cfg.pulse.hostname || 'pulse.mozilla.org',
+    cfg.pulse.hostname,
     ':',
     5671,                // Port for SSL
+    '/',
+    encodeURIComponent(cfg.pulse.vhost),
   ].join('');
 
   var monitor = null;
@@ -238,7 +240,9 @@ suite('Publish to Pulse', function() {
       // Others could be publishing to this exchange, so we check msgs > 0
       assert(messages.length > 0, 'Didn\'t get exactly any messages');
     }).finally(function() {
-      return conn.close();
+      if (conn) {
+        return conn.close();
+      }
     });
   });
 
