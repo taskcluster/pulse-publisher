@@ -6,7 +6,7 @@ A collection of utilities for interacting with Mozilla's [Pulse](https://pulsegu
 
 ## Requirements
 
-This is tested on and should run on any of node `{0.12, 4, 6, 7}`.
+This is tested on and should run on any of node `{7, 8, 10}`.
 
 ## Usage
 The source-code contains additional comments for each method.

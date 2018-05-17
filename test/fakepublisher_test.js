@@ -6,7 +6,7 @@ suite('Exchanges (FakePublisher)', function() {
   var path = require('path');
   var debug = require('debug')('test');
   var _ = require('lodash');
-  var FakePublisher = require('../lib/fake');
+  var FakePublisher = require('../src/fake');
 
   var exchanges = null;
   setup(async function() {
