@@ -520,7 +520,12 @@ Exchanges.prototype.connect = async function(options) {
   assert(options.validator, 'A base.validator function must be provided.');
   assert(options.credentials, 'Some kind of credentials are required.');
   let credentials = options.credentials;
-  assert(options.namespace || credentials.username || credentials.fake === true, 'Must provide a namespace.');
+  if (!credentials.fake) {
+    assert(options.namespace || credentials.username, 'Must provide a namespace or a username.');
+    assert(credentials.password, 'Must provide a password.');
+    assert(credentials.hostname, 'Must provide a hostname.');
+    assert(credentials.vhost, 'Must provide a vhost.');
+  }
 
   // Find exchange prefix, may be further prefixed if pulse credentials
   // are given
@@ -543,9 +548,11 @@ Exchanges.prototype.connect = async function(options) {
       ':',
       credentials.password,
       '@',
-      credentials.hostname || 'pulse.mozilla.org',
+      credentials.hostname,
       ':',
       5671,                // Port for SSL
+      '/',
+      encodeURIComponent(credentials.vhost),
     ].join('');
     connectionFunc = async () => ({
       connectionString,

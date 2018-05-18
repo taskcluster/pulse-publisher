@@ -6,7 +6,7 @@ A collection of utilities for interacting with Mozilla's [Pulse](https://pulsegu
 
 ## Requirements
 
-This is tested on and should run on any of node `{0.12, 4, 6, 7}`.
+This is tested on and should run on any of node `{7, 8, 10}`.
 
 ## Usage
 The source-code contains additional comments for each method.
@@ -83,7 +83,12 @@ exchanges.declare({
 
 // Some where in your app, instantiate a publisher
 let publisher = await exchanges.connect({
-  credentials: {clientId: '...', accessToken: '...'}, // client that can use tc-pulse
+  credentials: {
+    hostname: ..,
+    username: ..,
+    password: ..,
+    vhost: ..,
+  },
   namespace: '...', // namespace for the pulse exchanges (e.g., `taskcluster-glurble`)
   expires: '1 day', // lifetime of the namespace
   exchangePrefix: 'v1/', // Prefix for all exchanges (in addition to exchanges/<namespace>/)
@@ -95,6 +100,8 @@ let publisher = await exchanges.connect({
 await publisher.testExchange({someIdentifier: '...', routes: [], ...});
 ```
 
+Note that all four values for credentials must be included.
+
 Alternately, if using
 [taskcluster-lib-loader](https://github.com/taskcluster/taskcluster-lib-loader/pull/17/files),
 create a loader component that calls `setup`, which will also publish the exchange reference:
@@ -103,7 +110,7 @@ create a loader component that calls `setup`, which will also publish the exchan
   publisher: {
     requires: ['cfg', 'validator', 'monitor'],
     setup: ({cfg, validator, monitor}) => exchanges.setup({
-      credentials:        cfg.app.taskcluster,
+      credentials:        cfg.pulse,
       namespace:          cfg.pulse.namespace,
       expires:            cfg.pulse.expires,
       exchangePrefix:     cfg.app.exchangePrefix,
@@ -129,7 +136,7 @@ will result in a "fakePublish" message emitted from the publisher with content
 `{exchange, routingKey, payload, CCs}`.
 
 ## Testing
-You'll need to fill a file called `user-config.yml` with valid keys. There is a `user-config-exaemple.yml` you can copy over to see which keys are needed. Then it is just a matter of `yarn install` and `yarn test`.
+You'll need to fill a file called `user-config.yml` with valid keys. There is a `user-config-example.yml` you can copy over to see which keys are needed. Then it is just a matter of `yarn install` and `yarn test`.
 
 ## License
 [Mozilla Public License Version 2.0](https://github.com/taskcluster/pulse-publisher/blob/master/LICENSE)

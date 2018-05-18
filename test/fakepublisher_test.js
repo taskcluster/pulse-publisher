@@ -6,7 +6,7 @@ suite('Exchanges (FakePublisher)', function() {
   var path = require('path');
   var debug = require('debug')('test');
   var _ = require('lodash');
-  var FakePublisher = require('../lib/fake');
+  var FakePublisher = require('../src/fake');
 
   var exchanges = null;
   setup(async function() {
@@ -51,15 +51,16 @@ suite('Exchanges (FakePublisher)', function() {
           constant:       '-constant-',
         },
       ],
-      schema:             'http://localhost:1203/exchange-test-schema.json#',
+      schema:             'http://localhost:1203/schemas/pulse-publisher-tests/exchange-test-schema.json#',
       messageBuilder:     function(msg) { return msg; },
       routingKeyBuilder:  function(msg, rk) { return rk; },
       CCBuilder:          function(msg, rk, cc = []) {return cc;},
     });
 
     var validate = await validator({
+      rootUrl: 'http://localhost:1203/',
+      serviceName: 'pulse-publisher-tests',
       folder:  path.join(__dirname, 'schemas'),
-      baseUrl: 'http://localhost:1203/',
     });
 
     // Set options on exchanges
