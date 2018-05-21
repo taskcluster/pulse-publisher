@@ -1,17 +1,17 @@
-suite('Publish to Pulse', function() {
-  var assert     = require('assert');
-  var subject    = require('../');
-  var config     = require('typed-env-config');
-  var monitoring = require('taskcluster-lib-monitor');
-  var validator  = require('taskcluster-lib-validate');
-  var path       = require('path');
-  var fs         = require('fs');
-  var debug      = require('debug')('test');
-  var Promise    = require('promise');
-  var slugid     = require('slugid');
-  var amqplib    = require('amqplib');
-  var _          = require('lodash');
+const assert     = require('assert');
+const subject    = require('../');
+const config     = require('typed-env-config');
+const monitoring = require('taskcluster-lib-monitor');
+const validator  = require('taskcluster-lib-validate');
+const path       = require('path');
+const fs         = require('fs');
+const debug      = require('debug')('test');
+const slugid     = require('slugid');
+const amqplib    = require('amqplib');
+const _          = require('lodash');
+const libUrls    = require('taskcluster-lib-urls');
 
+suite('Publish to Pulse', function() {
   // Load necessary configuration
   var cfg = config({});
 
@@ -39,6 +39,8 @@ suite('Publish to Pulse', function() {
   var publisher = null;
   setup(async function() {
     exchanges = new subject({
+      name:               'test',
+      version:            'v1',
       title:              'Title for my Events',
       description:        'Test exchanges used for testing things only',
     });
@@ -79,15 +81,15 @@ suite('Publish to Pulse', function() {
           constant:       '-constant-',
         },
       ],
-      schema:             'http://localhost:1203/schemas/pulse-publisher-tests/exchange-test-schema.json#',
+      schema:             'exchange-test-schema.yml',
       messageBuilder:     function(msg) { return msg; },
       routingKeyBuilder:  function(msg, rk) { return rk; },
       CCBuilder:          function(msg, rk, cc = []) {return cc;},
     });
 
     var validate = await validator({
-      rootUrl: 'http://localhost:1203/',
-      serviceName: 'pulse-publisher-tests',
+      rootUrl: libUrls.testRootUrl(),
+      serviceName: 'test',
       folder:  path.join(__dirname, 'schemas'),
     });
 
@@ -100,7 +102,10 @@ suite('Publish to Pulse', function() {
     // Set options on exchanges
     exchanges.configure({validator: validate});
 
-    publisher = await exchanges.connect({credentials: cfg.pulse});
+    publisher = await exchanges.connect({
+      rootUrl: libUrls.testRootUrl(),
+      credentials: cfg.pulse,
+    });
   });
 
   teardown(function() {
@@ -222,7 +227,7 @@ suite('Publish to Pulse', function() {
       });
     }).then(function() {
       var testExchange = 'exchange/' + cfg.pulse.username +
-                         '/test-exchange';
+                         '/v1/test-exchange';
       return channel.bindQueue(queue, testExchange, 'myid.#');
     }).then(function() {
       return channel.consume(queue, function(msg) {
@@ -239,7 +244,7 @@ suite('Publish to Pulse', function() {
       return new Promise(function(accept) {setTimeout(accept, 400);});
     }).then(function() {
       // Others could be publishing to this exchange, so we check msgs > 0
-      assert(messages.length > 0, 'Didn\'t get exactly any messages');
+      assert(messages.length > 0, 'Didn\'t get any messages');
     }).finally(function() {
       if (conn) {
         return conn.close();
@@ -265,7 +270,7 @@ suite('Publish to Pulse', function() {
       });
     }).then(function() {
       var testExchange = 'exchange/' + cfg.pulse.username +
-                         '/test-exchange';
+                         '/v1/test-exchange';
       return Promise.all([
         channel.bindQueue(queue, testExchange, 'something.cced'),
       ]);
@@ -320,6 +325,7 @@ suite('Publish to Pulse', function() {
     var _publisher;
     assert(_.keys(monitor.counts).length === 0, 'We shouldn\'t have any points');
     return exchanges.connect({
+      rootUrl: libUrls.testRootUrl(),
       monitor,
       credentials: cfg.pulse,
     }).then(function(publisher) {
@@ -361,7 +367,7 @@ suite('Publish to Pulse', function() {
         durable:    false,
         autoDelete: true,
       });
-      var testExchange = 'exchange/' + namespace + '/test-exchange';
+      var testExchange = 'exchange/' + namespace + '/v1/test-exchange';
       await channel.bindQueue(queue, testExchange, 'myid.#');
       await channel.consume(queue, function(msg) {
         msg.content = JSON.parse(msg.content.toString());

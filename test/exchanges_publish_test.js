@@ -44,7 +44,7 @@ suite('Exchanges', function() {
           maxSize:        16,
         },
       ],
-      schema: 'http://schemas.taskcluster.net/base/tests/exchanges-test.json',
+      schema: 'exchanges-test.yml',
       messageBuilder:     function(test) { return test; },
       routingKeyBuilder:  function(test, state) {
         return {

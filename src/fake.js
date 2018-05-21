@@ -32,7 +32,8 @@ var FakePublisher = function(entries, exchangePrefix, options) {
 
       // Construct message and routing key from arguments
       var message = entry.messageBuilder.apply(undefined, args);
-      common.validateMessage(that._options.validator, entry, message);
+      common.validateMessage(that._options.rootUrl, that._options.name, that._options.version,
+        that._options.validator, entry, message);
 
       var routingKey = common.routingKeyToString(entry, entry.routingKeyBuilder.apply(undefined, args));
 
