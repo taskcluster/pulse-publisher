@@ -14,6 +14,8 @@ suite('Exchanges', function() {
   test('publish', function() {
     // Create an exchanges
     var exchanges = new subject({
+      serviceName:        'test',
+      version:            'v1',
       title:              'Title for my Events',
       description:        'Test exchanges used for testing things only',
     });

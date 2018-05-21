@@ -39,7 +39,7 @@ suite('Publish to Pulse', function() {
   var publisher = null;
   setup(async function() {
     exchanges = new subject({
-      name:               'test',
+      serviceName:        'test',
       version:            'v1',
       title:              'Title for my Events',
       description:        'Test exchanges used for testing things only',

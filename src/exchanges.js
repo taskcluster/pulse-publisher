@@ -54,7 +54,7 @@ var Publisher = function(entries, exchangePrefix, connectionFunc, options) {
     this[entry.name] = (...args) => {
       // Construct message and routing key from arguments
       var message = entry.messageBuilder.apply(undefined, args);
-      common.validateMessage(this._options.rootUrl, this._options.name, this._options.version,
+      common.validateMessage(this._options.rootUrl, this._options.serviceName, this._options.version,
         options.validator, entry, message);
 
       var routingKey = common.routingKeyToString(entry, entry.routingKeyBuilder.apply(undefined, args));
@@ -300,7 +300,7 @@ Publisher.prototype.close = async function() {
  *
  * options:
  * {
- *   name: serviceName,
+ *   serviceName: 'foo',
  *   version: 'v1',
  *   title: "Title of documentation page",
  *   description: "Description in markdown",
@@ -312,7 +312,7 @@ var Exchanges = function(options) {
   this._options = {
     durableExchanges:     true,
   };
-  assert(options.name,        'name must be provided');
+  assert(options.serviceName, 'serviceName must be provided');
   assert(options.version,     'version must be provided');
   assert(options.title,       'title must be provided');
   assert(options.description, 'description must be provided');
@@ -619,7 +619,7 @@ Exchanges.prototype.reference = function(options) {
     version:            0,
     $schema:          'http://schemas.taskcluster.net/base/v1/' +
                         'exchanges-reference.json#',
-    name:               options.name,
+    serviceName:        options.serviceName,
     title:              options.title,
     description:        options.description,
     exchangePrefix:     exchangePrefix,
@@ -634,7 +634,7 @@ Exchanges.prototype.reference = function(options) {
           return _.pick(key, 'name', 'summary', 'constant',
             'multipleWords', 'required');
         }),
-        schema: libUrls.schema(options.rootUrl, options.name, `${options.version}/${entry.schema}`),
+        schema: libUrls.schema(options.rootUrl, options.serviceName, `${options.version}/${entry.schema}`),
       };
     }),
   };
@@ -686,7 +686,7 @@ Exchanges.prototype.publish = function(options) {
   assert(!options.referenceBucket, 'referenceBucket is not allowed');
   assert(options.aws, 'aws must be provided');
 
-  const refUrl = libUrls.exchangeReference(options.rootUrl, options.name, options.version);
+  const refUrl = libUrls.exchangeReference(options.rootUrl, options.serviceName, options.version);
   const {hostname, path} = url.parse(refUrl);
 
   // Create S3 object

@@ -7,7 +7,7 @@ suite('Exchanges', function() {
   test('declare', function() {
     // Create an exchanges
     var exchanges = new Exchanges({
-      name:               'test',
+      serviceName:        'test',
       version:            'v1',
       title:              'Title for my Events',
       description:        'Test exchanges used for testing things only',
@@ -55,7 +55,7 @@ suite('Exchanges', function() {
   test('declare two', function() {
     // Create an exchanges
     var exchanges = new Exchanges({
-      name:               'test',
+      serviceName:        'test',
       version:            'v1',
       title:              'Title for my Events',
       description:        'Test exchanges used for testing things only',
@@ -140,7 +140,7 @@ suite('Exchanges', function() {
   test('reference', function() {
     // Create an exchanges
     var exchanges = new Exchanges({
-      name:               'test',
+      serviceName:        'test',
       version:            'v1',
       title:              'Title for my Events',
       description:        'Test exchanges used for testing things only',
@@ -190,14 +190,14 @@ suite('Exchanges', function() {
 
     var reference = exchanges.reference({rootUrl: libUrls.testRootUrl()});
     assert.equal(reference.version, 0);
-    assert.equal(reference.name, 'test');
+    assert.equal(reference.serviceName, 'test');
     assert.equal(reference.exchangePrefix, 'exchange/taskcluster-fake/v1/');
   });
 
   test('reference (pulse)', function() {
     // Create an exchanges
     var exchanges = new Exchanges({
-      name:               'test',
+      serviceName:        'test',
       version:            'v1',
       title:              'Title for my Events',
       description:        'Test exchanges used for testing things only',
@@ -259,7 +259,7 @@ suite('Exchanges', function() {
   test('error declare too long routing key', function() {
     // Create an exchanges
     var exchanges = new Exchanges({
-      name:               'test',
+      serviceName:        'test',
       version:            'v1',
       title:              'Title for my Events',
       description:        'Test exchanges used for testing things only',
@@ -316,7 +316,7 @@ suite('Exchanges', function() {
   test('error declare two multipleWords routing key entries', function() {
     // Create an exchanges
     var exchanges = new Exchanges({
-      name:               'test',
+      serviceName:        'test',
       version:            'v1',
       title:              'Title for my Events',
       description:        'Test exchanges used for testing things only',
@@ -372,7 +372,7 @@ suite('Exchanges', function() {
   test('declare (error without CCBuilder)', function() {
     // Create an exchanges
     var exchanges = new Exchanges({
-      name:               'test',
+      serviceName:        'test',
       version:            'v1',
       title:              'Title for my Events',
       description:        'Test exchanges used for testing things only',
