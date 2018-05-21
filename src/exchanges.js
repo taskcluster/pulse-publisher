@@ -485,6 +485,7 @@ Exchanges.prototype.configure = function(options) {
  *   username:        '...',   // Pulse username
  *   password:        '...',   // Pulse password
  *   hostname:        '...'    // Hostname, defaults to pulse.mozilla.org
+ *   vhost:           '/',     // Vhost
  * },
  * In this case, the namespace will default to the username.
  *
