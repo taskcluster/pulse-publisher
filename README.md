@@ -17,12 +17,13 @@ let Exchanges = require('pulse-publisher');
 
 // Create a new set of exchanges
 let exchanges = new Exchanges({
+  name: 'myservice', // should match serviceName
+  version: 'v1',
   title: 'Title for Exchanges Docs',
   description: [
     'Description in **markdown**.',
     'This will available in reference JSON',
   ].join(''),
-  schemaPrefix: 'https://.../', // Prefix for all schema keys given in exchanges.declare
 });
 
 // Declare an exchange
@@ -34,7 +35,7 @@ exchanges.declare({
     'Description in **markdown**.',
     'This will available in reference JSON',
   ].join(''),
-  schema:   'name-of-my-schema.json',   // Schema for payload, prefix by schemaPrefix
+  schema:   'name-of-my-schema.yml',   // Schema for payload, a file in `schemas/<version>`
   messageBuilder: (message) => message, // Build message from arguments given to publisher.testExchange(...)
   routingKey: [
     // Declaration of elements that makes up the routing key
@@ -83,6 +84,7 @@ exchanges.declare({
 
 // Some where in your app, instantiate a publisher
 let publisher = await exchanges.connect({
+  rootUrl: ...,
   credentials: {
     hostname: ..,
     username: ..,
@@ -91,7 +93,6 @@ let publisher = await exchanges.connect({
   },
   namespace: '...', // namespace for the pulse exchanges (e.g., `taskcluster-glurble`)
   expires: '1 day', // lifetime of the namespace
-  exchangePrefix: 'v1/', // Prefix for all exchanges (in addition to exchanges/<namespace>/)
   validator: await require('taskcluster-lib-validate'), // instance of taskcluster-lib-validate
   monitor: undefined, // optional instance of taskcluster-lib-monitor
 });
@@ -110,12 +111,11 @@ create a loader component that calls `setup`, which will also publish the exchan
   publisher: {
     requires: ['cfg', 'validator', 'monitor'],
     setup: ({cfg, validator, monitor}) => exchanges.setup({
+      rootUrl:            cfg.taskcluster.rootUrl,
       credentials:        cfg.pulse,
       namespace:          cfg.pulse.namespace,
       expires:            cfg.pulse.expires,
-      exchangePrefix:     cfg.app.exchangePrefix,
       validator:          validator,
-      referencePrefix:    'myservice/v1/exchanges.json',
       publish:            cfg.app.publishMetaData,
       aws:                cfg.aws,
       monitor:            monitor.prefix('publisher'),
@@ -123,7 +123,7 @@ create a loader component that calls `setup`, which will also publish the exchan
   },
 ```
 
-Docs can also be generated with exchange.reference(). See the source code docs for details.
+Docs can also be generated with `exchange.reference()`. See the source code docs for details.
 
 ### Test Support
 

@@ -1,4 +1,4 @@
-
+var url           = require('url');
 var assert        = require('assert');
 var debug         = require('debug')('base:exchanges');
 var _             = require('lodash');
@@ -12,6 +12,7 @@ var events        = require('events');
 var util          = require('util');
 var common        = require('./common');
 var taskcluster   = require('taskcluster-client');
+var libUrls       = require('taskcluster-lib-urls');
 
 // wait 30 seconds before closing a channel, to allow pending operations to flush
 var CLOSE_DELAY = 30 * 1000;
@@ -53,7 +54,8 @@ var Publisher = function(entries, exchangePrefix, connectionFunc, options) {
     this[entry.name] = (...args) => {
       // Construct message and routing key from arguments
       var message = entry.messageBuilder.apply(undefined, args);
-      common.validateMessage(this._options.validator, entry, message);
+      common.validateMessage(this._options.rootUrl, this._options.serviceName, this._options.version,
+        options.validator, entry, message);
 
       var routingKey = common.routingKeyToString(entry, entry.routingKeyBuilder.apply(undefined, args));
 
@@ -298,26 +300,24 @@ Publisher.prototype.close = async function() {
  *
  * options:
  * {
- *   title:              "Title of documentation page",
- *   description:        "Description in markdown",
- *   exchangePrefix:     'prefix/'            // For all exchanges declared here
- *   schemaPrefix:       "http://schemas...", // Prefix for all schemas
- *   durableExchanges:   true || false // If exchanges are durable
+ *   serviceName: 'foo',
+ *   version: 'v1',
+ *   title: "Title of documentation page",
+ *   description: "Description in markdown",
+ *   durableExchanges: true || false // If exchanges are durable (default true)
  * }
- *
- * You may choose the provide all the options now or later. Normally it makes
- * sense to declare title and description immediately, but leave exchangePrefix
- * and connection string as configurable things defined at runtime.
  */
 var Exchanges = function(options) {
   this._entries = [];
   this._options = {
-    exchangePrefix:       '',
     durableExchanges:     true,
-    schemaPrefix:         '',
   };
+  assert(options.serviceName, 'serviceName must be provided');
+  assert(options.version,     'version must be provided');
   assert(options.title,       'title must be provided');
   assert(options.description, 'description must be provided');
+  assert(!options.exchangePrefix, 'exchangePrefix is not allowed');
+  assert(!options.schemaPrefix, 'schemaPrefix is not allowed');
   this.configure(options);
 };
 
@@ -326,7 +326,7 @@ var Exchanges = function(options) {
  * options:
  * {
  *   exchange:     'exchange-name',      // exchange identifier on AMQP
- *   name:         "name_for_clients",   // name usable in client APIs
+ *   name:         "nameForClients",     // name usable in client APIs
  *   title:        "Exchange title",
  *   description:  "Exchange description in markdown",
  *   routingKey: [ // Description of words, that make up the routing key
@@ -340,7 +340,7 @@ var Exchanges = function(options) {
  *     },
  *     // More entries...
  *   ],
- *   schema:       'http://schemas...'   // Message schema
+ *   schema:       'foo-message.yml'     // Message schema (a file in schemas/v1)
  *   messageBuilder: function() {...}    // Return message from arguments given
  *   routingKeyBuilder: function() {...} // Return routing key from arguments
  *   CCBuilder: function() {...}         // Return list of CC'ed routing keys
@@ -372,10 +372,7 @@ Exchanges.prototype.declare = function(options) {
            'a string');
   });
 
-  // Prefix schemas if a prefix is declared
-  if (this._options.schemaPrefix) {
-    options.schema = this._options.schemaPrefix + options.schema;
-  }
+  assert(!options.schema.startsWith('http'), 'schema must be a bare filename in schemas/v1');
 
   // Validate routingKey declaration
   assert(options.routingKey instanceof Array,
@@ -471,11 +468,11 @@ Exchanges.prototype.configure = function(options) {
  *
  * Options:
  * {
+ *   rootUrl:                    // Taskcluster rootUrl for this service
  *   credentials: .. (see below)
  *   namespace: '...',           // pulse namespace (usually taskcluster-foo)
  *   expires: '1 year',           // time after which the namespace expires
  *   contact: 'foo@bar',         // contact email for the pulse namespace
- *   exchangePrefix:    '...',   // Exchange prefix ('v1/')
  *   validator:                  // Instance of base.validator
  *   monitor:           await require('taskcluster-lib-monitor')({...}),
  * }
@@ -485,6 +482,7 @@ Exchanges.prototype.configure = function(options) {
  *   username:        '...',   // Pulse username
  *   password:        '...',   // Pulse password
  *   hostname:        '...'    // Hostname, defaults to pulse.mozilla.org
+ *   vhost:           '/',     // Vhost
  * },
  * In this case, the namespace will default to the username.
  *
@@ -517,7 +515,8 @@ Exchanges.prototype.connect = async function(options) {
     credentials:        {},
   });
 
-  assert(options.validator, 'A base.validator function must be provided.');
+  assert(options.rootUrl, 'A rootUrl function must be provided.');
+  assert(options.validator, 'A validator must be provided.');
   assert(options.credentials, 'Some kind of credentials are required.');
   let credentials = options.credentials;
   if (!credentials.fake) {
@@ -527,12 +526,12 @@ Exchanges.prototype.connect = async function(options) {
     assert(credentials.vhost, 'Must provide a vhost.');
   }
 
-  // Find exchange prefix, may be further prefixed if pulse credentials
-  // are given
+  // Find exchange prefix
   var exchangePrefix = [
     'exchange',
-    options.namespace || credentials.username || 'fake',
-    options.exchangePrefix,
+    options.namespace || credentials.username || 'taskcluster-fake',
+    options.version,
+    '',
   ].join('/');
 
   // Clone entries for consistency
@@ -591,29 +590,25 @@ Exchanges.prototype.connect = async function(options) {
  * Return reference as JSON for the declared exchanges
  *
  * options: {
+ *   rootUrl: ...,
  *   credentials: {
  *     username:        '...',   // Pulse username
  *   },
- *   exchangePrefix:    '...',   // Exchange prefix, if not credentials
  * }
  */
 Exchanges.prototype.reference = function(options) {
   options = _.defaults({}, options || {}, this._options, {
     credentials:        {},
   });
+  assert(options.rootUrl, 'rootUrl must be given');
 
-  // Exchange prefix maybe prefixed additionally, if pulse credentials is given
-  var exchangePrefix = options.exchangePrefix;
-
-  // If we have a pulse user construct exchange prefix from username
-  if (options.credentials.username) {
-    // Construct exchange prefix
-    exchangePrefix = [
-      'exchange',
-      options.credentials.username,
-      options.exchangePrefix,
-    ].join('/');
-  }
+  // Find exchange prefix
+  var exchangePrefix = [
+    'exchange',
+    options.namespace || options.credentials.username || 'taskcluster-fake',
+    options.version,
+    '',
+  ].join('/');
 
   // Check title and description
   assert(options.title,       'title must be provided');
@@ -624,6 +619,7 @@ Exchanges.prototype.reference = function(options) {
     version:            0,
     $schema:          'http://schemas.taskcluster.net/base/v1/' +
                         'exchanges-reference.json#',
+    serviceName:        options.serviceName,
     title:              options.title,
     description:        options.description,
     exchangePrefix:     exchangePrefix,
@@ -638,7 +634,7 @@ Exchanges.prototype.reference = function(options) {
           return _.pick(key, 'name', 'summary', 'constant',
             'multipleWords', 'required');
         }),
-        schema:         entry.schema,
+        schema: libUrls.schema(options.rootUrl, options.serviceName, `${options.version}/${entry.schema}`),
       };
     }),
   };
@@ -668,12 +664,10 @@ Exchanges.prototype.reference = function(options) {
  *
  * options:
  * {
+ *   rootUrl: ...,
  *   credentials: {
  *     username:        '...',                // Pulse username (optional)
  *   },
- *   exchangePrefix:  'queue/v1/'             // Prefix for all exchanges
- *   referencePrefix: 'queue/v1/events.json'  // Prefix within S3 bucket
- *   referenceBucket: 'reference.taskcluster.net',
  *   aws: {             // AWS credentials and region
  *    accessKeyId:      '...',
  *    secretAccessKey:  '...',
@@ -685,19 +679,23 @@ Exchanges.prototype.reference = function(options) {
  */
 Exchanges.prototype.publish = function(options) {
   // Provide default options
-  options = _.defaults({}, options || {}, this._options, {
-    referenceBucket:    'references.taskcluster.net',
-  });
-  // Check that required options are provided
-  ['referencePrefix', 'aws'].forEach(function(key) {
-    assert(options[key], 'Option \'' + key + '\' must be provided');
-  });
+  options = _.defaults({}, options || {}, this._options);
+  assert(options.rootUrl, 'rootUrl is required');
+  assert(!options.exchangePrefix, 'exchangePrefix is not allowed');
+  assert(!options.referencePrefix, 'referencePrefix is not allowed');
+  assert(!options.referenceBucket, 'referenceBucket is not allowed');
+  assert(options.aws, 'aws must be provided');
+
+  const refUrl = libUrls.exchangeReference(options.rootUrl, options.serviceName, options.version);
+  const {hostname, path} = url.parse(refUrl);
+
   // Create S3 object
   var s3 = new aws.S3(options.aws);
+
   // Upload object
   return s3.putObject({
-    Bucket:           options.referenceBucket,
-    Key:              options.referencePrefix,
+    Bucket:           hostname,
+    Key:              path,
     Body:             JSON.stringify(this.reference(options), undefined, 2),
     ContentType:      'application/json',
   }).promise();

@@ -1,16 +1,19 @@
-suite('Exchanges (FakePublisher)', function() {
-  var assert = require('assert');
-  var subject = require('../');
-  var config = require('typed-env-config');
-  var validator = require('taskcluster-lib-validate');
-  var path = require('path');
-  var debug = require('debug')('test');
-  var _ = require('lodash');
-  var FakePublisher = require('../src/fake');
+const assert = require('assert');
+const subject = require('../');
+const config = require('typed-env-config');
+const validator = require('taskcluster-lib-validate');
+const path = require('path');
+const debug = require('debug')('test');
+const _ = require('lodash');
+const FakePublisher = require('../src/fake');
+const libUrls = require('taskcluster-lib-urls');
 
+suite('Exchanges (FakePublisher)', function() {
   var exchanges = null;
   setup(async function() {
     exchanges = new subject({
+      serviceName:        'test',
+      version:            'v1',
       title:              'Title for my Events',
       description:        'Test exchanges used for testing things only',
     });
@@ -51,15 +54,15 @@ suite('Exchanges (FakePublisher)', function() {
           constant:       '-constant-',
         },
       ],
-      schema:             'http://localhost:1203/schemas/pulse-publisher-tests/exchange-test-schema.json#',
+      schema:             'exchange-test-schema.yml',
       messageBuilder:     function(msg) { return msg; },
       routingKeyBuilder:  function(msg, rk) { return rk; },
       CCBuilder:          function(msg, rk, cc = []) {return cc;},
     });
 
     var validate = await validator({
-      rootUrl: 'http://localhost:1203/',
-      serviceName: 'pulse-publisher-tests',
+      rootUrl: libUrls.testRootUrl(),
+      serviceName: 'test',
       folder:  path.join(__dirname, 'schemas'),
     });
 
@@ -71,30 +74,29 @@ suite('Exchanges (FakePublisher)', function() {
   });
 
   // Test that we can connect to AMQP server
-  test('connect', function() {
-    return exchanges.connect({namespace: 'fake'}).then(function(publisher) {
-      assert(publisher instanceof FakePublisher,
-        'Should get an instance of exchanges.Publisher');
-    });
+  test('connect', async function() {
+    const publisher = await exchanges.connect({rootUrl: libUrls.testRootUrl(), namespace: 'fake'});
+    assert(publisher instanceof FakePublisher,
+      'Should get an instance of exchanges.Publisher');
   });
 
   // Test that we can publish messages
-  test('publish message', function() {
-    var published = [];
-    return exchanges.connect({namespace: 'fake'}).then(function(publisher) {
-      publisher.on('fakePublish', function(info) { published.push(info); });
-      return publisher.testExchange({someString: 'My message'}, {
-        testId:           'myid',
-        taskRoutingKey:   'some.string.with.dots',
-        state:            undefined, // Optional
-      });
-    }).then(function() {
-      assert(_.isEqual(published, [{
-        exchange: 'exchange/fake/test-exchange',
-        routingKey: 'myid.some.string.with.dots._._.-constant-',
-        payload: {someString: 'My message'},
-        CCs: []}]));
-    });;
+  test('publish message', async function() {
+    const published = [];
+    const publisher = await exchanges.connect({namespace: 'fake', rootUrl: libUrls.testRootUrl()});
+    publisher.on('fakePublish', function(info) { published.push(info); });
+
+    await publisher.testExchange({someString: 'My message'}, {
+      testId:           'myid',
+      taskRoutingKey:   'some.string.with.dots',
+      state:            undefined, // Optional
+    });
+
+    assert.deepEqual(published, [{
+      exchange: 'exchange/fake/v1/test-exchange',
+      routingKey: 'myid.some.string.with.dots._._.-constant-',
+      payload: {someString: 'My message'},
+      CCs: []}]);
   });
 
   // most of the validation s handled in testing the real publisher; this just checks that

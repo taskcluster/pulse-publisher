@@ -14,6 +14,8 @@ suite('Exchanges', function() {
   test('publish', function() {
     // Create an exchanges
     var exchanges = new subject({
+      serviceName:        'test',
+      version:            'v1',
       title:              'Title for my Events',
       description:        'Test exchanges used for testing things only',
     });
@@ -44,7 +46,7 @@ suite('Exchanges', function() {
           maxSize:        16,
         },
       ],
-      schema: 'http://schemas.taskcluster.net/base/tests/exchanges-test.json',
+      schema: 'exchanges-test.yml',
       messageBuilder:     function(test) { return test; },
       routingKeyBuilder:  function(test, state) {
         return {

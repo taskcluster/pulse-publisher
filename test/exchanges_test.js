@@ -1,11 +1,14 @@
-suite('Exchanges', function() {
-  var assert  = require('assert');
-  var subject = require('../');
-  var debug   = require('debug')('base:test:exchanges');
+const assert = require('assert');
+const Exchanges = require('../');
+const debug = require('debug')('test-exchanges');
+const libUrls = require('taskcluster-lib-urls');
 
+suite('Exchanges', function() {
   test('declare', function() {
     // Create an exchanges
-    var exchanges = new subject({
+    var exchanges = new Exchanges({
+      serviceName:        'test',
+      version:            'v1',
       title:              'Title for my Events',
       description:        'Test exchanges used for testing things only',
     });
@@ -36,7 +39,7 @@ suite('Exchanges', function() {
           maxSize:        16,
         },
       ],
-      schema: 'http://schemas.taskcluster.net/base/tests/exchanges-test.json',
+      schema: 'exchanges-test.yml',
       messageBuilder:     function(test) { return test; },
       routingKeyBuilder:  function(test, state) {
         return {
@@ -51,7 +54,9 @@ suite('Exchanges', function() {
 
   test('declare two', function() {
     // Create an exchanges
-    var exchanges = new subject({
+    var exchanges = new Exchanges({
+      serviceName:        'test',
+      version:            'v1',
       title:              'Title for my Events',
       description:        'Test exchanges used for testing things only',
     });
@@ -82,7 +87,7 @@ suite('Exchanges', function() {
           maxSize:        16,
         },
       ],
-      schema: 'http://schemas.taskcluster.net/base/tests/exchanges-test.json',
+      schema: 'exchanges-test.yml',
       messageBuilder:     function(test) { return test; },
       routingKeyBuilder:  function(test, state) {
         return {
@@ -119,7 +124,7 @@ suite('Exchanges', function() {
           maxSize:        16,
         },
       ],
-      schema: 'http://schemas.taskcluster.net/base/tests/exchanges-test.json',
+      schema: 'exchanges-test.yml',
       messageBuilder:     function(test) { return test; },
       routingKeyBuilder:  function(test, state) {
         return {
@@ -134,7 +139,9 @@ suite('Exchanges', function() {
 
   test('reference', function() {
     // Create an exchanges
-    var exchanges = new subject({
+    var exchanges = new Exchanges({
+      serviceName:        'test',
+      version:            'v1',
       title:              'Title for my Events',
       description:        'Test exchanges used for testing things only',
     });
@@ -169,7 +176,7 @@ suite('Exchanges', function() {
           constant:       '-constant-',
         },
       ],
-      schema: 'http://schemas.taskcluster.net/base/tests/exchanges-test.json',
+      schema: 'exchanges-test.yml',
       messageBuilder:     function(test) { return test; },
       routingKeyBuilder:  function(test, state) {
         return {
@@ -181,18 +188,19 @@ suite('Exchanges', function() {
       CCBuilder:          function() { return []; },
     });
 
-    var reference = exchanges.reference();
-    assert(reference.exchangePrefix === '');
-    var referencePrefixed = exchanges.reference({exchangePrefix: 'v1/'});
-    assert(referencePrefixed.exchangePrefix === 'v1/');
+    var reference = exchanges.reference({rootUrl: libUrls.testRootUrl()});
+    assert.equal(reference.version, 0);
+    assert.equal(reference.serviceName, 'test');
+    assert.equal(reference.exchangePrefix, 'exchange/taskcluster-fake/v1/');
   });
 
   test('reference (pulse)', function() {
     // Create an exchanges
-    var exchanges = new subject({
+    var exchanges = new Exchanges({
+      serviceName:        'test',
+      version:            'v1',
       title:              'Title for my Events',
       description:        'Test exchanges used for testing things only',
-      exchangePrefix:     'v1/',
     });
     // Check that we can declare an exchange
     exchanges.declare({
@@ -225,7 +233,7 @@ suite('Exchanges', function() {
           constant:       '-constant-',
         },
       ],
-      schema: 'http://schemas.taskcluster.net/base/tests/exchanges-test.json',
+      schema: 'exchanges-test.yml',
       messageBuilder:     function(test) { return test; },
       routingKeyBuilder:  function(test, state) {
         return {
@@ -238,6 +246,7 @@ suite('Exchanges', function() {
     });
 
     var reference = exchanges.reference({
+      rootUrl: libUrls.testRootUrl(),
       credentials: {
         username:   'test-user',
       },
@@ -249,7 +258,9 @@ suite('Exchanges', function() {
   // Test that we can't declare too long routing keys
   test('error declare too long routing key', function() {
     // Create an exchanges
-    var exchanges = new subject({
+    var exchanges = new Exchanges({
+      serviceName:        'test',
+      version:            'v1',
       title:              'Title for my Events',
       description:        'Test exchanges used for testing things only',
     });
@@ -280,7 +291,7 @@ suite('Exchanges', function() {
             maxSize:        128,
           },
         ],
-        schema: 'http://schemas.taskcluster.net/base/tests/exchanges-test.json',
+        schema: 'exchanges-test.yml',
         messageBuilder:     function(test) { return test; },
         routingKeyBuilder:  function(test, state) {
           return {
@@ -292,6 +303,9 @@ suite('Exchanges', function() {
         CCBuilder:          function() { return []; },
       });
     } catch (err) {
+      if (!err.toString().match(/cannot be larger than 255/)) {
+        throw err;
+      }
       debug('Got expected Error: %s, %j', err, err);
       return;
     }
@@ -301,7 +315,9 @@ suite('Exchanges', function() {
   // Test that we can't declare two multipleWords entries in a routing key
   test('error declare two multipleWords routing key entries', function() {
     // Create an exchanges
-    var exchanges = new subject({
+    var exchanges = new Exchanges({
+      serviceName:        'test',
+      version:            'v1',
       title:              'Title for my Events',
       description:        'Test exchanges used for testing things only',
     });
@@ -332,7 +348,7 @@ suite('Exchanges', function() {
             maxSize:        22,
           },
         ],
-        schema: 'http://schemas.taskcluster.net/base/tests/exchanges-test.json',
+        schema: 'exchanges-test.yml',
         messageBuilder:     function(test) { return test; },
         routingKeyBuilder:  function(test, state) {
           return {
@@ -344,6 +360,9 @@ suite('Exchanges', function() {
         CCBuilder:          function() { return []; },
       });
     } catch (err) {
+      if (!err.toString().match(/Can't have two multipleWord entries/)) {
+        throw err;
+      }
       debug('Got expected Error: %s, %j', err, err);
       return;
     }
@@ -352,7 +371,9 @@ suite('Exchanges', function() {
 
   test('declare (error without CCBuilder)', function() {
     // Create an exchanges
-    var exchanges = new subject({
+    var exchanges = new Exchanges({
+      serviceName:        'test',
+      version:            'v1',
       title:              'Title for my Events',
       description:        'Test exchanges used for testing things only',
     });
@@ -385,7 +406,7 @@ suite('Exchanges', function() {
             maxSize:        16,
           },
         ],
-        schema: 'http://schemas.taskcluster.net/base/tests/exchanges-test.json',
+        schema: 'exchanges-test.yml',
         messageBuilder:     function(test) { return test; },
         routingKeyBuilder:  function(test, state) {
           return {

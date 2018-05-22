@@ -18,6 +18,13 @@
             "type": "string",
             "format": "uri"
         },
+        "serviceName": {
+            "description": "Name of service for automation. Will be consumed by client generators to produce URLs",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 22,
+            "pattern": "^[a-z][a-z0-9_-]*$"
+        },
         "title": {
             "description": "Title for set of exchanges in markdown",
             "type": "string"

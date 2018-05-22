@@ -1,9 +1,10 @@
-
 var assert        = require('assert');
 var debug         = require('debug')('base:exchanges');
+var libUrls       = require('taskcluster-lib-urls');
 
-exports.validateMessage = function(validator, entry, message) {
-  var err = validator(message, entry.schema);
+exports.validateMessage = function(rootUrl, serviceName, version, validator, entry, message) {
+  const schema = libUrls.schema(rootUrl, serviceName, `${version}/${entry.schema}`);
+  var err = validator(message, schema);
   if (err) {
     debug('Failed validate message: %j against schema: %s, error: %j',
       message, entry.schema, err);
