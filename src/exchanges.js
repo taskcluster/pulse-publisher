@@ -686,8 +686,6 @@ Exchanges.prototype.publish = function(options) {
   assert(!options.referenceBucket, 'referenceBucket is not allowed');
   assert(options.aws, 'aws must be provided');
 
-  assert(options.rootUrl === 'https://taskcluster.net',
-    'publishing to S3 is only allowed with taskcluster.net');
   const refUrl = libUrls.exchangeReference(options.rootUrl, options.serviceName, options.version);
   const {hostname, path} = url.parse(refUrl);
 
