@@ -60,16 +60,15 @@ suite('Exchanges', function() {
 
     // Publish
     return exchanges.publish({
-      referencePrefix:      'base/test/exchanges.json',
-      referenceBucket:      cfg.testBucket,
+      rootUrl: 'https://test-bucket-for-any-garbage',
       aws:                  cfg.aws,
     }).then(function() {
       // Get the file... we don't bother checking the contents this is good
       // enough
       var s3 = new aws.S3(cfg.aws);
       return s3.getObject({
-        Bucket:     cfg.testBucket,
-        Key:        'base/test/exchanges.json',
+        Bucket:     'test-bucket-for-any-garbage',
+        Key:        'references/test/v1/exchanges.json',
       }).promise();
     }).then(function(res) {
       var reference = JSON.parse(res.Body);
