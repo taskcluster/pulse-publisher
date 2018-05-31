@@ -313,6 +313,7 @@ var Exchanges = function(options) {
     durableExchanges:     true,
   };
   assert(options.serviceName, 'serviceName must be provided');
+  assert(options.projectName, 'projectName must be provided');
   assert(options.version,     'version must be provided');
   assert(options.title,       'title must be provided');
   assert(options.description, 'description must be provided');
@@ -527,9 +528,13 @@ Exchanges.prototype.connect = async function(options) {
   }
 
   // Find exchange prefix
+  const namespace = options.namespace || credentials.username || 'taskcluster-fake';
+  if (process.env.NODE_ENV === 'production') {
+    assert(namespace === options.projectName, 'in production, the namespace must match the projectName');
+  }
   var exchangePrefix = [
     'exchange',
-    options.namespace || credentials.username || 'taskcluster-fake',
+    namespace,
     options.version,
     '',
   ].join('/');
@@ -587,43 +592,32 @@ Exchanges.prototype.connect = async function(options) {
 };
 
 /**
- * Return reference as JSON for the declared exchanges
- *
- * options: {
- *   rootUrl: ...,
- *   credentials: {
- *     username:        '...',   // Pulse username
- *   },
- * }
+ * Return reference as JSON for the declared exchanges.  This is based only on the declared
+ * exchange information.
  */
-Exchanges.prototype.reference = function(options) {
-  options = _.defaults({}, options || {}, this._options, {
-    credentials:        {},
-  });
-  assert(options.rootUrl, 'rootUrl must be given');
-
-  // Find exchange prefix
+Exchanges.prototype.reference = function() {
+  // Build exchange prefix based on projectName
   var exchangePrefix = [
     'exchange',
-    options.namespace || options.credentials.username || 'taskcluster-fake',
-    options.version,
+    this._options.projectName,
+    this._options.version,
     '',
   ].join('/');
 
   // Check title and description
-  assert(options.title,       'title must be provided');
-  assert(options.description, 'description must be provided');
+  assert(this._options.title,       'title must be provided');
+  assert(this._options.description, 'description must be provided');
 
   // Create reference
   var reference = {
     version:            0,
     $schema:          'http://schemas.taskcluster.net/base/v1/' +
                         'exchanges-reference.json#',
-    serviceName:        options.serviceName,
-    title:              options.title,
-    description:        options.description,
+    serviceName:        this._options.serviceName,
+    title:              this._options.title,
+    description:        this._options.description,
     exchangePrefix:     exchangePrefix,
-    entries: this._entries.map(function(entry) {
+    entries: this._entries.map(entry => {
       return {
         type:           'topic-exchange',
         exchange:       entry.exchange,
@@ -634,7 +628,7 @@ Exchanges.prototype.reference = function(options) {
           return _.pick(key, 'name', 'summary', 'constant',
             'multipleWords', 'required');
         }),
-        schema: libUrls.schema(options.rootUrl, options.serviceName, `${options.version}/${entry.schema}`),
+        schema: `${this._options.version}/${entry.schema}`,
       };
     }),
   };
@@ -696,7 +690,7 @@ Exchanges.prototype.publish = function(options) {
   return s3.putObject({
     Bucket:           hostname,
     Key:              path.slice(1), // omit leading `/`
-    Body:             JSON.stringify(this.reference(options), undefined, 2),
+    Body:             JSON.stringify(this.reference(), undefined, 2),
     ContentType:      'application/json',
   }).promise();
 };

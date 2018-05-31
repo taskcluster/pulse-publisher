@@ -100,8 +100,7 @@
                     },
                     "schema": {
                         "type": "string",
-                        "format": "uri",
-                        "description": "JSON schema for messages posted on this exchange"
+                        "description": "JSON schema for messages on this exchange. The value must be a relative URI, based on the service's schema location; that is, based at `<rootUrl>/schemas/<serviceName`."
                     }
                 },
                 "additionalProperties": false,
