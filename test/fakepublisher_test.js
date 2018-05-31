@@ -13,6 +13,7 @@ suite('Exchanges (FakePublisher)', function() {
   setup(async function() {
     exchanges = new subject({
       serviceName:        'test',
+      projectName:        'taskcluster-test',
       version:            'v1',
       title:              'Title for my Events',
       description:        'Test exchanges used for testing things only',
@@ -63,6 +64,7 @@ suite('Exchanges (FakePublisher)', function() {
     var validate = await validator({
       rootUrl: libUrls.testRootUrl(),
       serviceName: 'test',
+      projectName: 'taskcluster-test',
       folder:  path.join(__dirname, 'schemas'),
     });
 
