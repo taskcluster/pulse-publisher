@@ -93,7 +93,7 @@ let publisher = await exchanges.connect({
   },
   namespace: '...', // namespace for the pulse exchanges (e.g., `taskcluster-glurble`)
   expires: '1 day', // lifetime of the namespace
-  validator: await require('taskcluster-lib-validate'), // instance of taskcluster-lib-validate
+  validator: await schemaset.validator(rootUrl),
   monitor: undefined, // optional instance of taskcluster-lib-monitor
 });
 
@@ -109,13 +109,13 @@ create a loader component that calls `setup`, which will also publish the exchan
 
 ```js
   publisher: {
-    requires: ['cfg', 'validator', 'monitor'],
+    requires: ['cfg', 'schemaset', 'monitor'],
     setup: ({cfg, validator, monitor}) => exchanges.setup({
       rootUrl:            cfg.taskcluster.rootUrl,
       credentials:        cfg.pulse,
       namespace:          cfg.pulse.namespace,
       expires:            cfg.pulse.expires,
-      validator:          validator,
+      validator:          await schemaset.validator(cft.taskcluster.rootUrl),
       publish:            cfg.app.publishMetaData,
       aws:                cfg.aws,
       monitor:            monitor.prefix('publisher'),
