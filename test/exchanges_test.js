@@ -195,6 +195,9 @@ suite('Exchanges', function() {
     assert.equal(reference.version, 0);
     assert.equal(reference.serviceName, 'test');
     assert.equal(reference.exchangePrefix, 'exchange/taskcluster-test/v1/');
+    // schema property is a relative uri that, when combined with the base
+    // uri for the service, will generate the schema's $id
+    assert.equal(reference.entries[0].schema, 'v1/exchanges-test.json#');
   });
 
   // Test that we can't declare too long routing keys

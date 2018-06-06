@@ -374,6 +374,7 @@ Exchanges.prototype.declare = function(options) {
   });
 
   assert(!options.schema.startsWith('http'), 'schema must be a bare filename in schemas/v1');
+  options.schema = `${this._options.version}/${options.schema.replace(/ya?ml$/, 'json#')}`;
 
   // Validate routingKey declaration
   assert(options.routingKey instanceof Array,
@@ -628,7 +629,7 @@ Exchanges.prototype.reference = function() {
           return _.pick(key, 'name', 'summary', 'constant',
             'multipleWords', 'required');
         }),
-        schema: `${this._options.version}/${entry.schema}`,
+        schema: entry.schema,
       };
     }),
   };
