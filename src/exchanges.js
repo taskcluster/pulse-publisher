@@ -522,14 +522,15 @@ Exchanges.prototype.connect = async function(options) {
   assert(options.credentials, 'Some kind of credentials are required.');
   let credentials = options.credentials;
   if (!credentials.fake) {
-    assert(options.namespace || credentials.username, 'Must provide a namespace or a username.');
+    assert(options.namespace, 'Must provide a namespace.');
+    assert(credentials.username, 'Must provide a username.');
     assert(credentials.password, 'Must provide a password.');
     assert(credentials.hostname, 'Must provide a hostname.');
     assert(credentials.vhost, 'Must provide a vhost.');
   }
 
   // Find exchange prefix
-  const namespace = options.namespace || credentials.username || 'taskcluster-fake';
+  const namespace = options.namespace || 'taskcluster-fake';
   if (process.env.NODE_ENV === 'production') {
     assert(namespace === options.projectName, 'in production, the namespace must match the projectName');
   }
