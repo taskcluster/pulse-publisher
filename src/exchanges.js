@@ -531,7 +531,9 @@ Exchanges.prototype.connect = async function(options) {
   // Find exchange prefix
   const namespace = options.namespace || credentials.username || 'taskcluster-fake';
   if (process.env.NODE_ENV === 'production') {
-    assert(namespace === options.projectName, 'in production, the namespace must match the projectName');
+    const projectName = this._options.projectName;
+    assert(namespace === projectName,
+      `in production, the namespace (${namespace}) must match the projectName (${projectName})`);
   }
   var exchangePrefix = [
     'exchange',
