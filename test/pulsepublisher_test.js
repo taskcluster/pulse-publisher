@@ -15,23 +15,23 @@ suite('Publish to Pulse', function() {
   // Load necessary configuration
   var cfg = config({});
 
-  if (!cfg.pulse.password) {
-    console.log('Skipping tests due to missing cfg.pulse');
+  if (!cfg.pulse.credentials.password) {
+    console.log('Skipping tests due to missing cfg.pulse.credentials');
     this.pending = true;
   }
 
   // ConnectionString for use with amqplib only
   var connectionString = [
     'amqps://',         // Ensure that we're using SSL
-    cfg.pulse.username,
+    cfg.pulse.credentials.username,
     ':',
-    cfg.pulse.password,
+    cfg.pulse.credentials.password,
     '@',
-    cfg.pulse.hostname,
+    cfg.pulse.credentials.hostname,
     ':',
     5671,                // Port for SSL
     '/',
-    encodeURIComponent(cfg.pulse.vhost),
+    encodeURIComponent(cfg.pulse.credentials.vhost),
   ].join('');
 
   var monitor = null;
@@ -106,7 +106,8 @@ suite('Publish to Pulse', function() {
 
     publisher = await exchanges.connect({
       rootUrl: libUrls.testRootUrl(),
-      credentials: cfg.pulse,
+      credentials: cfg.pulse.credentials,
+      namespace:   cfg.pulse.namespace,
     });
   });
 
@@ -215,7 +216,7 @@ suite('Publish to Pulse', function() {
   test('publish message (and receive)', function() {
     var conn,
       channel,
-      queue = 'queue/' + cfg.pulse.username + '/test/' + slugid.v4();
+      queue = 'queue/' + cfg.pulse.credentials.username + '/test/' + slugid.v4();
     var messages = [];
     return amqplib.connect(connectionString).then(function(conn_) {
       conn = conn_;
@@ -228,7 +229,7 @@ suite('Publish to Pulse', function() {
         autoDelete: true,
       });
     }).then(function() {
-      var testExchange = 'exchange/' + cfg.pulse.username +
+      var testExchange = 'exchange/' + cfg.pulse.credentials.username +
                          '/v1/test-exchange';
       return channel.bindQueue(queue, testExchange, 'myid.#');
     }).then(function() {
@@ -258,7 +259,7 @@ suite('Publish to Pulse', function() {
   test('publish message (and receive by CC)', function() {
     var conn,
       channel,
-      queue = 'queue/' + cfg.pulse.username + '/test/' + slugid.v4();
+      queue = 'queue/' + cfg.pulse.credentials.username + '/test/' + slugid.v4();
     var messages = [];
     return amqplib.connect(connectionString).then(function(conn_) {
       conn = conn_;
@@ -271,7 +272,7 @@ suite('Publish to Pulse', function() {
         autoDelete: true,
       });
     }).then(function() {
-      var testExchange = 'exchange/' + cfg.pulse.username +
+      var testExchange = 'exchange/' + cfg.pulse.credentials.username +
                          '/v1/test-exchange';
       return Promise.all([
         channel.bindQueue(queue, testExchange, 'something.cced'),
@@ -329,7 +330,7 @@ suite('Publish to Pulse', function() {
     return exchanges.connect({
       rootUrl: libUrls.testRootUrl(),
       monitor,
-      credentials: cfg.pulse,
+      credentials: cfg.pulse.credentials,
     }).then(function(publisher) {
       _publisher = publisher;
       return publisher.testExchange({someString: 'My message'}, {
@@ -352,7 +353,7 @@ suite('Publish to Pulse', function() {
     }
 
     test('publish message (and receive)', async function() {
-      var queue = 'queue/' + cfg.pulse.username + '/test/' + slugid.v4(),
+      var queue = 'queue/' + cfg.pulse.credentials.username + '/test/' + slugid.v4(),
         namespace = 'taskcluster-tests-' + slugid.nice();
       var messages = [];
 

@@ -6,7 +6,9 @@ defaults:
     region:           'us-west-2'
     apiVersion:       '2014-01-01'
   pulse:
-    username:         !env PULSE_USERNAME
-    password:         !env PULSE_PASSWORD
-    hostname:         !env PULSE_HOSTNAME
-    vhost:            !env PULSE_VHOST
+    namespace:          !env PULSE_NAMESPACE
+    credentials:
+      username:         !env PULSE_USERNAME
+      password:         !env PULSE_PASSWORD
+      hostname:         !env PULSE_HOSTNAME
+      vhost:            !env PULSE_VHOST
